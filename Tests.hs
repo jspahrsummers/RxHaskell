@@ -34,4 +34,4 @@ testAppending = do
 testSubject = do
     (subj, s'') <- subject
     subscribe s'' sub
-    send subj $ Just "hello world"
+    subj $ Just "hello world"
