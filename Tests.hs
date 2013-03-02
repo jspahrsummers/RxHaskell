@@ -1,5 +1,6 @@
 module Tests where
 
+import Control.Monad
 import Data.Monoid
 import Signal
 
