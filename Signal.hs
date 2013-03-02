@@ -23,7 +23,7 @@ signal = Signal
 
 -- | Subscribes to a signal.
 subscribe :: Signal a -> Subscriber a -> IO ()
-subscribe (Signal s) next = s next
+subscribe (Signal s) = s
 
 instance Monad Signal where
     return v =

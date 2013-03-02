@@ -16,10 +16,7 @@ subject = do
     subj <- newMVar Seq.empty
 
     let s = signal $ \sub ->
-                modifyMVar_ subj $ \subSeq ->
-                    return $ subSeq |> sub
-        sub m = do
-            subSeq <- readMVar subj
-            sequence_ (fmap (\sub -> sub m) subSeq)
+                modifyMVar_ subj $ return . flip (|>) sub
+        sub m = readMVar subj >>= sequence_ . fmap (\sub -> sub m)
 
     return (sub, s)
