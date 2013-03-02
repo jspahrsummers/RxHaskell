@@ -7,13 +7,21 @@ import Control.Monad
 import Data.Maybe
 import Data.Monoid
 
+-- | A callback for a 'Signal'.
+-- | The values of the signal are sent as @Just a@. 'Nothing' will be sent upon completion.
 type Subscriber a = Maybe a -> IO ()
 
+-- | A stream of future values.
 data Signal a = Signal (Subscriber a -> IO ())
 
-signal :: (Subscriber a -> IO ()) -> Signal a
+-- | Constructs a signal.
+signal
+    :: (Subscriber a -> IO ()) -- ^ A function to run upon each subscription to the signal.
+    -> Signal a                -- ^ The constructed signal.
+
 signal = Signal
 
+-- | Subscribes to a signal.
 subscribe :: Signal a -> Subscriber a -> IO ()
 subscribe (Signal s) next = s next
 
