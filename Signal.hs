@@ -11,6 +11,9 @@ type Subscriber a = Maybe a -> IO ()
 
 data Signal a = Signal (Subscriber a -> IO ())
 
+signal :: (Subscriber a -> IO ()) -> Signal a
+signal = Signal
+
 subscribe :: Signal a -> Subscriber a -> IO ()
 subscribe (Signal s) next = s next
 
@@ -43,3 +46,8 @@ instance Monad Signal where
                 subscribe (f v) onInnerNext
 
         subscribe s onOuterNext
+
+    a >> b = Signal $ \sub ->
+        let onNext Nothing = subscribe b sub
+            onNext _ = return ()
+        in subscribe a onNext
