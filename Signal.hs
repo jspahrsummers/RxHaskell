@@ -66,3 +66,6 @@ instance Monoid (Signal a) where
         let onNext Nothing = subscribe b sub
             onNext m = sub m
         in subscribe a onNext
+
+instance Functor Signal where
+    fmap f s = s >>= return . f
