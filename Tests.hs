@@ -3,6 +3,7 @@ module Tests where
 import Control.Monad
 import Data.Monoid
 import Signal
+import Subject
 
 s = signal $ \sub -> do
     sub $ Just "hello"
@@ -29,3 +30,8 @@ testAppending = do
     subscribe (s `mappend` mempty) sub
     subscribe (s `mappend` s') sub
     subscribe (s' `mappend` s) sub
+
+testSubject = do
+    (subj, s'') <- subject
+    subscribe s'' sub
+    send subj $ Just "hello world"
