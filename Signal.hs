@@ -25,7 +25,7 @@ instance Monad Signal where
         in Signal f
 
     s >>= f = Signal $ \sub -> do
-        sc <- newMVar (0 :: Integer)
+        sc <- newMVar (1 :: Integer)
 
         let decSubscribers :: IO ()
             decSubscribers = do

@@ -12,6 +12,13 @@ s' = signal $ \sub -> do
 
 sub = putStrLn . show
 
+testBinding =
+    let ss = signal $ \sub -> do
+                sub $ Just s
+                sub $ Just s'
+                sub Nothing
+    in subscribe (join ss) sub
+
 testSequencing = do
     subscribe (s >> s') sub
     subscribe (s' >> s) sub
