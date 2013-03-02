@@ -3,6 +3,7 @@ module Tests where
 import Control.Monad
 import Data.Monoid
 import Signal
+import Signal.Operators as Op
 import Subject
 
 s = signal $ \sub -> do
@@ -35,3 +36,7 @@ testSubject = do
     (subj, s'') <- subject
     subscribe s'' sub
     subj $ Just "hello world"
+
+testFilter = do
+    let s'' = s `mappend` s' `Op.filter` (\(x:xs) -> x == 'h')
+    subscribe s'' sub
