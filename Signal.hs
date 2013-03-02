@@ -11,7 +11,7 @@ type Subscriber a = Maybe a -> IO ()
 
 data Signal a = Signal (Subscriber a -> IO ())
 
-subscribe :: Signal a -> (Maybe a -> IO ()) -> IO ()
+subscribe :: Signal a -> Subscriber a -> IO ()
 subscribe (Signal s) next = s next
 
 instance Monad Signal where
@@ -21,7 +21,7 @@ instance Monad Signal where
                 next Nothing
         in Signal f
 
-    (>>=) s f = Signal $ \sub -> do
+    s >>= f = Signal $ \sub -> do
         sc <- newMVar (0 :: Integer)
 
         let decSubscribers :: IO ()
@@ -35,7 +35,7 @@ instance Monad Signal where
                     else return ()
 
             onInnerNext Nothing = decSubscribers
-            onInnerNext m@(Just _) = sub m
+            onInnerNext m = sub m
 
             onOuterNext Nothing = decSubscribers
             onOuterNext (Just v) = do
