@@ -1,6 +1,6 @@
 {-# LANGUAGE Safe #-}
 
-module RxHaskell.Signal () where
+module Signal (Subscriber, Signal, signal, subscribe) where
 
 import Control.Concurrent.MVar
 import Control.Exception
