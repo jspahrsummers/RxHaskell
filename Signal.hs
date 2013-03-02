@@ -3,9 +3,9 @@
 module Signal (Subscriber, Signal, signal, subscribe) where
 
 import Control.Concurrent.MVar
-import Control.Exception
 import Control.Monad
 import Data.Maybe
+import Data.Monoid
 
 type Subscriber a = Maybe a -> IO ()
 
@@ -50,4 +50,11 @@ instance Monad Signal where
     a >> b = Signal $ \sub ->
         let onNext Nothing = subscribe b sub
             onNext _ = return ()
+        in subscribe a onNext
+
+instance Monoid (Signal a) where
+    mempty = Signal $ \sub -> sub Nothing
+    a `mappend` b = Signal $ \sub ->
+        let onNext Nothing = subscribe b sub
+            onNext m = sub m
         in subscribe a onNext

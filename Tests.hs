@@ -1,5 +1,6 @@
 module Tests where
 
+import Data.Monoid
 import Signal
 
 s = signal $ \sub -> do
@@ -22,3 +23,8 @@ testBinding =
 testSequencing = do
     subscribe (s >> s') sub
     subscribe (s' >> s) sub
+
+testAppending = do
+    subscribe (s `mappend` mempty) sub
+    subscribe (s `mappend` s') sub
+    subscribe (s' `mappend` s) sub
