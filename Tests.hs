@@ -55,9 +55,19 @@ testFilter = do
         `filter` (\(x:xs) -> x == 'h')
         >>: putSub
 
+testDoEvent = do
+    hello
+        `doEvent` (\_ -> putStrLn "event")
+        >>: putSub
+
 testDoNext = do
     hello
         `doNext` (\_ -> putStrLn "next")
+        >>: putSub
+
+testDoCompleted = do
+    hello
+        `doCompleted` (putStrLn "completed")
         >>: putSub
 
 testTake = do
