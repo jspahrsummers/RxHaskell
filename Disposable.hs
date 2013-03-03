@@ -3,17 +3,20 @@
 module Disposable ( Disposable
                   , dispose
                   , newDisposable
+                  , empty
                   ) where
 
-import Control.Applicative
+import Control.Applicative ((<$), (<$>))
 import Data.IORef
 
 -- | Represents an operation which can be canceled or a resource which can be freed.
-data Disposable = Disposable (IO ()) (IORef Bool)
+data Disposable = ActionDisposable (IO ()) (IORef Bool)
+                | EmptyDisposable
 
 -- | Disposes a disposable. Returns whether it was already disposed.
 dispose :: Disposable -> IO Bool
-dispose (Disposable action d) = do
+dispose EmptyDisposable = return True
+dispose (ActionDisposable action d) = do
     b <- atomicModifyIORef d $ \b -> (True, b)
     if b
         then b <$ action
@@ -21,7 +24,13 @@ dispose (Disposable action d) = do
 
 -- | Creates a disposable which runs the given action upon disposal.
 newDisposable :: IO () -> IO Disposable
-newDisposable action = Disposable action <$> newIORef False
+newDisposable action = ActionDisposable action <$> newIORef False
+
+-- | Returns a disposable which does no work.
+empty :: Disposable
+empty = EmptyDisposable
 
 instance Eq Disposable where
-    (Disposable _ a) == (Disposable _ b) = a == b
+    (ActionDisposable _ a) == (ActionDisposable _ b) = a == b
+    EmptyDisposable == EmptyDisposable = True
+    _ == _ = False
