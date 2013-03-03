@@ -6,6 +6,7 @@ import Control.Monad
 import Data.IORef
 import Data.Maybe
 import Data.Monoid
+import Data.Word
 
 -- | A callback for a 'Signal'.
 -- | The values of the signal are sent as @Just a@. 'Nothing' will be sent upon completion.
@@ -33,7 +34,7 @@ instance Monad Signal where
         in Signal f
 
     s >>= f = Signal $ \sub -> do
-        sc <- newIORef (1 :: Integer)
+        sc <- newIORef (1 :: Word32)
 
         let decSubscribers :: IO ()
             decSubscribers = do
