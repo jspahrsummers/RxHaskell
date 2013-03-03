@@ -12,17 +12,23 @@ filter s f =
     let f' x = if f x then return x else mempty
     in s >>= f'
 
--- | Runs the function whenever the event passes the given predicate.
-doEvent :: (Maybe a -> Bool) -> Signal a -> (Maybe a -> IO ()) -> Signal a
-doEvent p s f =
+-- | Runs the function whenever signal sends an event.
+doEvent :: Signal a -> (Maybe a -> IO ()) -> Signal a
+doEvent s f =
     signal $ \sub ->
-        let onEvent m = if p m then f m >> sub m else sub m
+        let onEvent m = f m >> sub m
         in s `subscribe` onEvent
 
 -- | Runs a function on each value.
-doNext :: Signal a -> (Maybe a -> IO ()) -> Signal a
-doNext = doEvent isJust
+doNext :: Signal a -> (a -> IO ()) -> Signal a
+doNext s f =
+    let f' (Just x) = f x
+        f' Nothing = return ()
+    in doEvent s f'
 
 -- | Runs the function on each completion.
-doCompleted :: Signal a -> (Maybe a -> IO ()) -> Signal a
-doCompleted = doEvent isNothing
+doCompleted :: Signal a -> (() -> IO ()) -> Signal a
+doCompleted s f =
+    let f' (Just x) = return ()
+        f' Nothing = f ()
+    in doEvent s f'
