@@ -15,8 +15,6 @@ import Subscriber
 hello = fromFoldable ["hello"]
 world = fromFoldable ["world"]
 
-putSub = putStrLn . show
-
 testBinding =
     let ss =
             signal $ \sub -> do
@@ -24,72 +22,72 @@ testBinding =
                 send sub $ NextEvent world
                 send sub CompletedEvent
                 return Disposable.empty
-    in join ss >>: putSub
+    in join ss >>: print
 
 testSequencing = do
-    (hello >> world) >>: putSub
-    (world >> hello) >>: putSub
+    (hello >> world) >>: print
+    (world >> hello) >>: print
 
 testAppending = do
     hello
         `mappend` mempty
-        >>: putSub
+        >>: print
 
     hello
         `mappend` world
-        >>: putSub
+        >>: print
 
     world
         `mappend` hello
-        >>: putSub
+        >>: print
 
 testSubject = do
     (subj, s) <- subject
-    s >>: putSub
+    s >>: print
     send subj $ NextEvent "hello world"
 
 testFilter = do
     hello
         `mappend` world
         `filter` (\(x:xs) -> x == 'h')
-        >>: putSub
+        >>: print
 
 testDoEvent = do
     hello
         `doEvent` (\_ -> putStrLn "event")
-        >>: putSub
+        >>: print
 
 testDoNext = do
     hello
         `doNext` (\_ -> putStrLn "next")
-        >>: putSub
+        >>: print
 
 testDoCompleted = do
     hello
-        `doCompleted` (putStrLn "completed")
-        >>: putSub
+        `doCompleted` putStrLn "completed"
+        >>: print
 
 testTake = do
     fromFoldable ["foo", "bar", "buzz", "baz"]
         `take` 2
-        >>: putSub
+        >>: print
 
 testZip = do
     let zipSub (NextEvent (a, b)) = putStrLn $ a ++ " / " ++ b
-        zipSub ev = putStrLn $ show ev
+        zipSub x = print x
 
     mzip (fromFoldable ["foo", "bar"]) (fromFoldable ["buzz", "baz"])
         >>: zipSub
 
 testMaterialize = do
-    (materialize hello)
-        >>: putStrLn . show
+    materialize hello
+        >>: print
 
-    (dematerialize (materialize hello))
-        >>: putStrLn . show
+    dematerialize (materialize hello)
+        >>: print
 
 testScheduling = do
     s <- newScheduler
     s' <- newScheduler
-    mapM_ (\x -> schedule s (putStrLn $ show x)) [1..50]
-    mapM_ (\x -> schedule s' (putStrLn $ show x)) [1..50]
+    mapM_ (schedule s . print) [1..50]
+    mapM_ (schedule s' . print) [1..50]

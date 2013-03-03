@@ -9,6 +9,7 @@ module Subscriber ( Subscriber
 import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.STM
+import Control.Monad
 import Data.Word
 import Disposable
 import Event
@@ -35,7 +36,7 @@ subscriber f = do
     lt <- atomically $ newTVar tid
     tlc <- atomically $ newTVar 0
 
-    return $ Subscriber {
+    return Subscriber {
         onEvent = f,
         disposable = d,
         lockedThread = lt,
@@ -52,7 +53,7 @@ acquireSubscriber sub tid = do
         else do
             tlc <- readTVar (threadLockCounter sub)
             lt <- readTVar (lockedThread sub)
-            if tlc > 0 && lt /= tid then retry else return ()
+            when (tlc > 0 && lt /= tid) retry
 
             writeTVar (lockedThread sub) tid
             writeTVar (threadLockCounter sub) $ tlc + 1
@@ -74,11 +75,9 @@ send s ev =
     let send' s ev@(NextEvent _) = onEvent s ev
         send' s ev = do
             d <- dispose (disposable s)
-            if d then return () else onEvent s ev
+            unless d $ onEvent s ev
     in do
         tid <- myThreadId
         b <- atomically $ acquireSubscriber s tid
 
-        if b
-            then send' s ev >> atomically (releaseSubscriber s tid)
-            else return ()
+        when b $ send' s ev >> atomically (releaseSubscriber s tid)

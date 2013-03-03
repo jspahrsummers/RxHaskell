@@ -26,7 +26,7 @@ subject = do
 
         onEvent ev = do
             subs <- readIORef subj
-            mapM_ (flip send ev) subs
+            mapM_ (`send` ev) subs
 
     sub <- subscriber onEvent
     return (sub, s)

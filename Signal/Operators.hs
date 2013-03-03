@@ -10,6 +10,7 @@ module Signal.Operators ( fromFoldable
                         , take
                         ) where
 
+import Control.Monad
 import Data.Foldable
 import Data.IORef
 import Data.Monoid
@@ -82,9 +83,7 @@ take s n =
                     _ -> send sub ev
 
             onEvent ev = do
-                b <- atomicModifyIORef remRef $ \rem ->
-                    (0, if rem == 0 then False else True)
-
-                if b then send sub ev else return ()
+                b <- atomicModifyIORef remRef $ \rem -> (0, rem /= 0)
+                when b $ send sub ev
 
         s >>: onEvent

@@ -63,9 +63,7 @@ instance Monad Signal where
                         let n' = n - 1
                         in (n', n')
 
-                    if rem == 0
-                        then send sub CompletedEvent
-                        else return ()
+                    when (rem == 0) $ send sub CompletedEvent
 
                 onInner CompletedEvent = decSubscribers
                 onInner ev = send sub ev
@@ -106,7 +104,7 @@ instance Monoid (Signal a) where
             return cd
 
 instance Functor Signal where
-    fmap f s = s >>= return . f
+    fmap = liftM
 
 instance MonadZip Signal where
     a `mzip` b =
@@ -127,9 +125,7 @@ instance MonadZip Signal where
                     oc <- readTVar otherDone
                     ol <- length <$> readTVar otherVals
 
-                    if (vc && vl == 0) || (oc && ol == 0)
-                        then return [CompletedEvent]
-                        else return []
+                    return $ if (vc && vl == 0) || (oc && ol == 0) then [CompletedEvent] else []
                 
                 onEvent' :: (TVar (Seq a), TVar Bool) -> (TVar (Seq b), TVar Bool) -> (Seq a -> Seq b -> Seq (x, y)) -> Event a -> STM [Event (x, y)]
                 onEvent' vt@(vals, _) ot@(otherVals, _) f (NextEvent v) = do

@@ -7,6 +7,7 @@ module Scheduler ( Scheduler
 
 import Control.Concurrent
 import Control.Concurrent.STM
+import Control.Monad
 import Data.IORef
 import Disposable
 
@@ -22,10 +23,10 @@ data Scheduler = Scheduler {
 -- | Creates a new background scheduler.
 newScheduler :: IO Scheduler
 newScheduler = do
-    q <- atomically $ newTQueue
+    q <- atomically newTQueue
     tid <- forkIO $ schedulerMain q
 
-    return $ Scheduler {
+    return Scheduler {
         thread = tid,
         queue = q
     }
@@ -43,7 +44,7 @@ schedulerMain q = do
     (ref, action) <- atomically $ readTQueue q
 
     d <- readIORef ref
-    if d then return () else action
+    unless d action
 
     yield
     schedulerMain q
