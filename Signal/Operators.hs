@@ -1,6 +1,8 @@
 {-# LANGUAGE Safe #-}
 
-module Signal.Operators where
+module Signal.Operators ( filter
+                        , doNext
+                        ) where
 
 import Data.Monoid
 import Signal

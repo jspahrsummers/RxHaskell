@@ -1,6 +1,7 @@
 {-# LANGUAGE Safe #-}
 
-module Subject (subject) where
+module Subject ( subject
+               ) where
 
 import Data.Foldable
 import Data.Functor

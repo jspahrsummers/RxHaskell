@@ -1,6 +1,11 @@
 {-# LANGUAGE Safe #-}
 
-module Signal (Subscriber, Signal, signal, subscribe, (>>:)) where
+module Signal ( Subscriber
+              , Signal
+              , signal
+              , subscribe
+              , (>>:)
+              ) where
 
 import Control.Monad
 import Data.IORef
