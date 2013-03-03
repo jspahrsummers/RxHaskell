@@ -8,12 +8,16 @@ module Signal ( Signal
               ) where
 
 import Control.Applicative
+import Control.Concurrent.STM
 import Control.Monad
+import Control.Monad.Zip
 import Data.IORef
 import Data.Monoid
+import Data.Sequence as Seq
 import Data.Word
 import Disposable
 import Event
+import Prelude hiding (length, drop, zip)
 import Subscriber
 
 -- | A stream of future values.
@@ -103,3 +107,56 @@ instance Monoid (Signal a) where
 
 instance Functor Signal where
     fmap f s = s >>= return . f
+
+instance MonadZip Signal where
+    a `mzip` b =
+        signal $ \sub -> do
+            aVals <- atomically $ newTVar Seq.empty
+            aDone <- atomically $ newTVar False
+
+            bVals <- atomically $ newTVar Seq.empty
+            bDone <- atomically $ newTVar False
+
+            cd <- newCompositeDisposable
+
+            let completed :: (TVar (Seq a), TVar Bool) -> (TVar (Seq b), TVar Bool) -> STM [Event (x, y)]
+                completed (vals, done) (otherVals, otherDone) = do
+                    vc <- readTVar done
+                    vl <- length <$> readTVar vals
+
+                    oc <- readTVar otherDone
+                    ol <- length <$> readTVar otherVals
+
+                    if (vc && vl == 0) || (oc && ol == 0)
+                        then return [CompletedEvent]
+                        else return []
+                
+                onEvent' :: (TVar (Seq a), TVar Bool) -> (TVar (Seq b), TVar Bool) -> (Seq a -> Seq b -> Seq (x, y)) -> Event a -> STM [Event (x, y)]
+                onEvent' vt@(vals, _) ot@(otherVals, _) f (NextEvent v) = do
+                    modifyTVar' vals (|> v)
+
+                    vs <- readTVar vals
+                    os <- readTVar otherVals
+
+                    case viewl $ f vs os of
+                        (t :< _) -> do
+                            modifyTVar' vals $ drop 1
+                            modifyTVar' otherVals $ drop 1
+                            
+                            (:) (NextEvent t) <$> completed vt ot
+
+                        _ -> return []
+
+                onEvent' vt@(vals, done) ot _ CompletedEvent = completed vt ot
+                onEvent' _ _ _ (ErrorEvent e) = return [ErrorEvent e]
+
+                onEvent vt ot f ev = do
+                    evl <- atomically (onEvent' vt ot f ev)
+                    mapM_ (send sub) evl
+
+            let at = (aVals, aDone)
+                bt = (bVals, bDone)
+
+            a >>: onEvent at bt zip >>= addDisposable cd
+            b >>: onEvent bt at (flip zip) >>= addDisposable cd
+            return cd

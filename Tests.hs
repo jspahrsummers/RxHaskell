@@ -1,6 +1,7 @@
 module Tests where
 
 import Control.Monad
+import Control.Monad.Zip
 import Data.Monoid
 import Prelude hiding (filter, take)
 import Disposable
@@ -71,3 +72,10 @@ testTake = do
     fromFoldable ["foo", "bar", "buzz", "baz"]
         `take` 2
         >>: putSub
+
+testZip = do
+    let zipSub (NextEvent (a, b)) = putStrLn $ a ++ " / " ++ b
+        zipSub ev = putStrLn $ show ev
+
+    mzip (fromFoldable ["foo", "bar"]) (fromFoldable ["buzz", "baz"])
+        >>: zipSub
