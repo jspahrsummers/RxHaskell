@@ -1,6 +1,6 @@
 {-# LANGUAGE Safe #-}
 
-module Signal (Subscriber, Signal, signal, subscribe) where
+module Signal (Subscriber, Signal, signal, subscribe, (>>:)) where
 
 import Control.Monad
 import Data.IORef
@@ -25,6 +25,10 @@ signal = Signal
 -- | Subscribes to a signal.
 subscribe :: Signal a -> Subscriber a -> IO ()
 subscribe (Signal s) = s
+
+-- | A symbolic alias for 'subscribe'.
+(>>:) = subscribe
+infixl 1 >>:
 
 instance Monad Signal where
     return v =

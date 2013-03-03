@@ -25,37 +25,37 @@ testBinding =
                 sub $ Just hello
                 sub $ Just world
                 sub Nothing
-    in join ss `subscribe` putSub
+    in join ss >>: putSub
 
 testSequencing = do
-    (hello >> world) `subscribe` putSub
-    (world >> hello) `subscribe` putSub
+    (hello >> world) >>: putSub
+    (world >> hello) >>: putSub
 
 testAppending = do
     hello
         `mappend` mempty
-        `subscribe` putSub
+        >>: putSub
 
     hello
         `mappend` world
-        `subscribe` putSub
+        >>: putSub
 
     world
         `mappend` hello
-        `subscribe` putSub
+        >>: putSub
 
 testSubject = do
     (subj, s) <- subject
-    s `subscribe` putSub
+    s >>: putSub
     subj $ Just "hello world"
 
 testFilter = do
     hello
         `mappend` world
         `filter` (\(x:xs) -> x == 'h')
-        `subscribe` putSub
+        >>: putSub
 
 testDoNext = do
     hello
         `doNext` (\_ -> putStrLn "next")
-        `subscribe` putSub
+        >>: putSub
