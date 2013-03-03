@@ -31,9 +31,9 @@ instance Monad Signal where
         let f next = do
                 next $ Just v
                 next Nothing
-        in Signal f
+        in signal f
 
-    s >>= f = Signal $ \sub -> do
+    s >>= f = signal $ \sub -> do
         sc <- newIORef (1 :: Word32)
 
         let decSubscribers :: IO ()
@@ -56,14 +56,14 @@ instance Monad Signal where
 
         subscribe s onOuterNext
 
-    a >> b = Signal $ \sub ->
+    a >> b = signal $ \sub ->
         let onNext Nothing = subscribe b sub
             onNext _ = return ()
         in subscribe a onNext
 
 instance Monoid (Signal a) where
-    mempty = Signal $ \sub -> sub Nothing
-    a `mappend` b = Signal $ \sub ->
+    mempty = signal $ \sub -> sub Nothing
+    a `mappend` b = signal $ \sub ->
         let onNext Nothing = subscribe b sub
             onNext m = sub m
         in subscribe a onNext
