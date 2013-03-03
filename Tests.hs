@@ -2,8 +2,9 @@ module Tests where
 
 import Control.Monad
 import Data.Monoid
+import Prelude hiding (filter)
 import Signal
-import Signal.Operators as Op
+import Signal.Operators
 import Subject
 
 s =
@@ -51,10 +52,10 @@ testSubject = do
 testFilter = do
     s
         `mappend` s'
-        `Op.filter` (\(x:xs) -> x == 'h')
+        `filter` (\(x:xs) -> x == 'h')
         `subscribe` sub
 
 testDoNext = do
     s
-        `Op.doNext` (\_ -> putStrLn "next")
+        `doNext` (\_ -> putStrLn "next")
         `subscribe` sub
