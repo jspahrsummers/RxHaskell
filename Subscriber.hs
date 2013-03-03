@@ -21,13 +21,15 @@ data Subscriber a = Subscriber {
     onEvent :: OnEvent a,
     disposable :: Disposable,
     lockedThread :: TVar ThreadId,
-    threadLockCounter :: TVar Word32
+    threadLockCounter :: TVar Word32,
+    disposed :: TVar Bool
 }
 
 -- | Constructs a subscriber.
 subscriber :: OnEvent a -> IO (Subscriber a)
 subscriber f = do
-    d <- newDisposable $ return ()
+    b <- atomically $ newTVar False
+    d <- newDisposable $ atomically $ writeTVar b True
 
     tid <- myThreadId
     lt <- atomically $ newTVar tid
@@ -37,18 +39,24 @@ subscriber f = do
         onEvent = f,
         disposable = d,
         lockedThread = lt,
-        threadLockCounter = tlc
+        threadLockCounter = tlc,
+        disposed = b
     }
 
 -- | Acquires a subscriber for the specified thread.
-acquireSubscriber :: Subscriber a -> ThreadId -> STM ()
+acquireSubscriber :: Subscriber a -> ThreadId -> STM Bool
 acquireSubscriber sub tid = do
-    tlc <- readTVar (threadLockCounter sub)
-    lt <- readTVar (lockedThread sub)
-    if tlc > 0 && lt /= tid then retry else return ()
+    d <- readTVar (disposed sub)
+    if d
+        then return False
+        else do
+            tlc <- readTVar (threadLockCounter sub)
+            lt <- readTVar (lockedThread sub)
+            if tlc > 0 && lt /= tid then retry else return ()
 
-    writeTVar (lockedThread sub) tid
-    writeTVar (threadLockCounter sub) $ tlc + 1
+            writeTVar (lockedThread sub) tid
+            writeTVar (threadLockCounter sub) $ tlc + 1
+            return True
 
 -- | Releases a subscriber from the specified thread's ownership.
 releaseSubscriber :: Subscriber a -> ThreadId -> STM ()
@@ -64,12 +72,13 @@ releaseSubscriber sub tid = do
 send :: Subscriber a -> Event a -> IO ()
 send s ev =
     let send' s ev@(NextEvent _) = onEvent s ev
-        send' s ev = dispose (disposable s) >> onEvent s ev
+        send' s ev = do
+            d <- dispose (disposable s)
+            if d then return () else onEvent s ev
     in do
         tid <- myThreadId
-        atomically $ acquireSubscriber s tid
-        send' s ev
-        atomically $ releaseSubscriber s tid
+        b <- atomically $ acquireSubscriber s tid
 
-instance Eq (Subscriber a) where
-    a == b = (disposable a) == (disposable b)
+        if b
+            then send' s ev >> atomically (releaseSubscriber s tid)
+            else return ()
