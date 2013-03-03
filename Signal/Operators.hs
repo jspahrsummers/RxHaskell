@@ -1,9 +1,16 @@
 {-# LANGUAGE Safe #-}
 
-module Signal.Operators where
+module Signal.Operators ( filter
+                        , doEvent
+                        , doNext
+                        , doCompleted
+                        , take
+                        ) where
 
+import Data.IORef
 import Data.Monoid
 import Data.Maybe (isJust, isNothing)
+import Prelude hiding (filter, take)
 import Signal
 
 -- | Filters the values of a signal according to a predicate.
@@ -17,7 +24,7 @@ doEvent :: Signal a -> (Maybe a -> IO ()) -> Signal a
 doEvent s f =
     signal $ \sub ->
         let onEvent m = f m >> sub m
-        in s `subscribe` onEvent
+        in s >>: onEvent
 
 -- | Runs a function on each value.
 doNext :: Signal a -> (a -> IO ()) -> Signal a
@@ -32,3 +39,18 @@ doCompleted s f =
     let f' (Just x) = return ()
         f' Nothing = f ()
     in doEvent s f'
+
+-- | Returns a signal of the first @n@ elements.
+take :: Integral n => Signal a -> n -> Signal a
+take s n =
+    signal $ \sub -> do
+        remRef <- newIORef n
+
+        s >>: \m -> do
+            old <- atomicModifyIORef remRef $ \rem ->
+                if rem == 0 then (0, 0) else (rem - 1, rem)
+
+            case old of
+                0 -> return ()
+                1 -> sub m >> sub Nothing
+                _ -> sub m
