@@ -6,6 +6,7 @@ import Data.Monoid
 import Prelude hiding (filter, take)
 import Disposable
 import Event
+import Scheduler
 import Signal
 import Signal.Operators
 import Subject
@@ -86,3 +87,9 @@ testMaterialize = do
 
     (dematerialize (materialize hello))
         >>: putStrLn . show
+
+testScheduling = do
+    s <- newScheduler
+    s' <- newScheduler
+    mapM_ (\x -> schedule s (putStrLn $ show x)) [1..50]
+    mapM_ (\x -> schedule s' (putStrLn $ show x)) [1..50]
