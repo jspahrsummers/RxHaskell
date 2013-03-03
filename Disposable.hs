@@ -10,6 +10,7 @@ module Disposable ( Disposable
 
 import Control.Applicative ((<$), (<$>))
 import Control.Concurrent.MVar
+import Control.Monad
 import Data.IORef
 
 -- | A list of disposables, along with a flag indicating whether disposal already happened.
@@ -30,11 +31,13 @@ dispose (ActionDisposable action d) = do
         else return b
 
 dispose (CompositeDisposable dl) = 
-    let modify (True, _) = return ((True, []), True)
-        modify (False, xs) = do
-            mapM_ dispose xs
-            return ((True, []), False)
-    in modifyMVar dl modify
+    let disposedList = (True, [])
+        modify (True, _) = return (disposedList, disposedList)
+        modify (False, xs) = return (disposedList, (False, xs))
+    in do
+        (b, xs) <- modifyMVar dl modify
+        unless b $ mapM_ dispose xs
+        return b
 
 -- | Creates a disposable which runs the given action upon disposal.
 newDisposable :: IO () -> IO Disposable
@@ -47,9 +50,11 @@ newCompositeDisposable = CompositeDisposable <$> newMVar (False, [])
 -- | Adds disposable @d@ to the composite disposable.
 addDisposable :: Disposable -> Disposable -> IO ()
 addDisposable (CompositeDisposable dl) d =
-    let modify (True, _) = (True, []) <$ dispose d
-        modify (False, xs) = return (False, d : xs)
-    in modifyMVar_ dl modify
+    let modify (True, _) = return ((True, []), True)
+        modify (False, xs) = return ((False, d : xs), False)
+    in do
+        b <- modifyMVar dl modify
+        when b $ dispose d >> return ()
 
 -- | Returns a disposable which does no work.
 empty :: Disposable
