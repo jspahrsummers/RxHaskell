@@ -14,10 +14,6 @@ import Data.Maybe
 import Data.Monoid
 import Data.Word
 
--- | A callback for a 'Signal'.
--- | The values of the signal are sent as @Just a@. 'Nothing' will be sent upon completion.
-type Subscriber a = Maybe a -> IO ()
-
 -- | A stream of future values.
 data Signal a = Signal (Subscriber a -> IO ())
 
