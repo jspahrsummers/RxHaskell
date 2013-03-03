@@ -15,8 +15,9 @@ subject :: IO (Subscriber a, Signal a)
 subject = do
     subj <- newIORef Seq.empty
 
-    let s = signal $ \sub ->
+    let sub m = readIORef subj >>= sequence_ . fmap (flip ($) m)
+        s =
+            signal $ \sub ->
                 atomicModifyIORef subj $ \seq -> (seq |> sub, ())
-        sub m = readIORef subj >>= sequence_ . fmap (flip ($) m)
 
     return (sub, s)

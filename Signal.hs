@@ -28,45 +28,47 @@ subscribe (Signal s) = s
 
 instance Monad Signal where
     return v =
-        let f next = do
-                next $ Just v
-                next Nothing
-        in signal f
+        signal $ \next -> do
+            next $ Just v
+            next Nothing
 
-    s >>= f = signal $ \sub -> do
-        sc <- newIORef (1 :: Word32)
+    s >>= f =
+        signal $ \sub -> do
+            sc <- newIORef (1 :: Word32)
 
-        let decSubscribers :: IO ()
-            decSubscribers = do
-                rem <- atomicModifyIORef sc $ \n ->
-                    let n' = n - 1
-                    in (n', n')
+            let decSubscribers :: IO ()
+                decSubscribers = do
+                    rem <- atomicModifyIORef sc $ \n ->
+                        let n' = n - 1
+                        in (n', n')
 
-                if rem == 0
-                    then sub Nothing
-                    else return ()
+                    if rem == 0
+                        then sub Nothing
+                        else return ()
 
-            onInnerNext Nothing = decSubscribers
-            onInnerNext m = sub m
+                onInnerNext Nothing = decSubscribers
+                onInnerNext m = sub m
 
-            onOuterNext Nothing = decSubscribers
-            onOuterNext (Just v) = do
-                atomicModifyIORef sc $ \n -> (n + 1, ())
-                subscribe (f v) onInnerNext
+                onOuterNext Nothing = decSubscribers
+                onOuterNext (Just v) = do
+                    atomicModifyIORef sc $ \n -> (n + 1, ())
+                    f v `subscribe` onInnerNext
 
-        subscribe s onOuterNext
+            s `subscribe` onOuterNext
 
-    a >> b = signal $ \sub ->
-        let onNext Nothing = subscribe b sub
-            onNext _ = return ()
-        in subscribe a onNext
+    a >> b =
+        signal $ \sub ->
+            let onNext Nothing = b `subscribe` sub
+                onNext _ = return ()
+            in a `subscribe` onNext
 
 instance Monoid (Signal a) where
     mempty = signal $ \sub -> sub Nothing
-    a `mappend` b = signal $ \sub ->
-        let onNext Nothing = subscribe b sub
-            onNext m = sub m
-        in subscribe a onNext
+    a `mappend` b =
+        signal $ \sub ->
+            let onNext Nothing = b `subscribe` sub
+                onNext m = sub m
+            in a `subscribe` onNext
 
 instance Functor Signal where
     fmap f s = s >>= return . f
