@@ -1,6 +1,6 @@
 {-# LANGUAGE Safe #-}
 
-module Signal.Operators ( filter
+module Signal.Operators ( Signal.Operators.filter
                         , doNext
                         ) where
 
