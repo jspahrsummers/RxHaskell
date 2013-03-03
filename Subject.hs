@@ -7,8 +7,12 @@ import Data.Foldable
 import Data.Functor
 import Data.IORef
 import Data.Sequence as Seq
-import Prelude hiding (sequence_)
+import Data.Traversable
+import Disposable
+import Event
+import Prelude hiding (mapM_)
 import Signal
+import Subscriber
 
 -- | Creates a controllable signal, represented by a subscriber (a.k.a. sink) and signal pair.
 -- | Sending values on the subscriber will deliver them to all of the signal's subscribers.
@@ -16,9 +20,13 @@ subject :: IO (Subscriber a, Signal a)
 subject = do
     subj <- newIORef Seq.empty
 
-    let sub m = readIORef subj >>= sequence_ . fmap (flip ($) m)
-        s =
+    let s =
             signal $ \sub ->
-                atomicModifyIORef subj $ \seq -> (seq |> sub, ())
+                atomicModifyIORef subj $ \seq -> (seq |> sub, Disposable.empty)
 
+        onEvent ev = do
+            subs <- readIORef subj
+            mapM_ (flip send ev) subs
+
+    sub <- subscriber onEvent
     return (sub, s)

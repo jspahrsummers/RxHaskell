@@ -3,28 +3,34 @@ module Tests where
 import Control.Monad
 import Data.Monoid
 import Prelude hiding (filter, take)
+import Disposable
+import Event
 import Signal
 import Signal.Operators
 import Subject
+import Subscriber
 
 hello =
     signal $ \sub -> do
-        sub $ Just "hello"
-        sub Nothing
+        send sub $ NextEvent "hello"
+        send sub CompletedEvent
+        return Disposable.empty
 
 world =
     signal $ \sub -> do
-        sub $ Just "world"
-        sub Nothing
+        send sub $ NextEvent "world"
+        send sub CompletedEvent
+        return Disposable.empty
 
 putSub = putStrLn . show
 
 testBinding =
     let ss =
             signal $ \sub -> do
-                sub $ Just hello
-                sub $ Just world
-                sub Nothing
+                send sub $ NextEvent hello
+                send sub $ NextEvent world
+                send sub CompletedEvent
+                return Disposable.empty
     in join ss >>: putSub
 
 testSequencing = do
@@ -47,7 +53,7 @@ testAppending = do
 testSubject = do
     (subj, s) <- subject
     s >>: putSub
-    subj $ Just "hello world"
+    send subj $ NextEvent "hello world"
 
 testFilter = do
     hello

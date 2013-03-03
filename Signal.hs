@@ -1,53 +1,57 @@
 {-# LANGUAGE Safe #-}
 
-module Signal ( Subscriber
-              , Signal
+module Signal ( Signal
               , signal
               , subscribe
               , (>>:)
               , never
               ) where
 
+import Control.Applicative
 import Control.Monad
 import Data.IORef
-import Data.Maybe
 import Data.Monoid
 import Data.Word
-
--- | A callback for a 'Signal'.
--- | The values of the signal are sent as @Just a@. 'Nothing' will be sent upon completion.
-type Subscriber a = Maybe a -> IO ()
+import Disposable
+import Event
+import Subscriber
 
 -- | A stream of future values.
-data Signal a = Signal (Subscriber a -> IO ())
+data Signal a = Signal (Subscriber a -> IO Disposable)
 
 -- | Constructs a signal.
 signal
-    :: (Subscriber a -> IO ()) -- ^ A function to run upon each subscription to the signal.
-    -> Signal a                -- ^ The constructed signal.
+    :: (Subscriber a -> IO Disposable)  -- ^ A function to run upon each subscription to the signal.
+    -> Signal a                         -- ^ The constructed signal.
 
 signal = Signal
 
 -- | Returns a signal which never sends any events.
-never = signal $ const $ return ()
+never = signal $ const $ return Disposable.empty
 
 -- | Subscribes to a signal.
-subscribe :: Signal a -> Subscriber a -> IO ()
+subscribe :: Signal a -> Subscriber a -> IO Disposable
 subscribe (Signal s) = s
 
--- | A symbolic alias for 'subscribe'.
-(>>:) = subscribe
+-- | Creates a subscriber and subscribes to the signal.
+(>>:) :: Signal a -> OnEvent a -> IO Disposable
+(>>:) s f = do
+    sub <- subscriber f
+    subscribe s sub
+
 infixl 1 >>:
 
 instance Monad Signal where
     return v =
-        signal $ \next -> do
-            next $ Just v
-            next Nothing
+        signal $ \sub -> do
+            send sub $ NextEvent v
+            send sub CompletedEvent
+            return Disposable.empty
 
     s >>= f =
         signal $ \sub -> do
             sc <- newIORef (1 :: Word32)
+            cd <- newCompositeDisposable
 
             let decSubscribers :: IO ()
                 decSubscribers = do
@@ -56,32 +60,46 @@ instance Monad Signal where
                         in (n', n')
 
                     if rem == 0
-                        then sub Nothing
+                        then send sub CompletedEvent
                         else return ()
 
-                onInnerNext Nothing = decSubscribers
-                onInnerNext m = sub m
+                onInner CompletedEvent = decSubscribers
+                onInner ev = send sub ev
 
-                onOuterNext Nothing = decSubscribers
-                onOuterNext (Just v) = do
+                onOuter CompletedEvent = decSubscribers
+                onOuter (ErrorEvent e) = send sub $ ErrorEvent e
+                onOuter (NextEvent v) = do
                     atomicModifyIORef sc $ \n -> (n + 1, ())
-                    f v >>: onInnerNext
+                    f v >>: onInner >>= addDisposable cd
 
-            s >>: onOuterNext
+            s >>: onOuter >>= addDisposable cd
+            return cd
 
     a >> b =
-        signal $ \sub ->
-            let onNext Nothing = b >>: sub
-                onNext _ = return ()
-            in a >>: onNext
+        signal $ \sub -> do
+            cd <- newCompositeDisposable
+
+            let onEvent CompletedEvent = b `subscribe` sub >>= addDisposable cd
+                onEvent (ErrorEvent e) = send sub $ ErrorEvent e
+                onEvent _ = return ()
+
+            a >>: onEvent >>= addDisposable cd
+            return cd
 
 instance Monoid (Signal a) where
-    mempty = signal $ \sub -> sub Nothing
-    a `mappend` b =
+    mempty =
         signal $ \sub ->
-            let onNext Nothing = b >>: sub
-                onNext m = sub m
-            in a >>: onNext
+            Disposable.empty <$ send sub CompletedEvent
+
+    a `mappend` b =
+        signal $ \sub -> do
+            cd <- newCompositeDisposable
+
+            let onEvent CompletedEvent = b `subscribe` sub >>= addDisposable cd
+                onEvent e = send sub e
+            
+            a >>: onEvent >>= addDisposable cd
+            return cd
 
 instance Functor Signal where
     fmap f s = s >>= return . f
