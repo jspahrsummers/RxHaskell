@@ -9,6 +9,7 @@ import Event
 import Scheduler
 import Signal
 import Signal.Operators
+import Signal.Scheduled
 import Subject
 import Subscriber
 
@@ -91,3 +92,11 @@ testScheduling = do
     s' <- newScheduler
     mapM_ (schedule s . print) [1..50]
     mapM_ (schedule s' . print) [1..50]
+
+testScheduledSignal = do
+    s <- newScheduler
+    sig <- start s $ \sub -> do
+        send sub $ NextEvent "foo"
+        send sub $ NextEvent "bar"
+        send sub CompletedEvent
+    sig >>: print
