@@ -34,10 +34,10 @@ doNext s f =
     in doEvent s f'
 
 -- | Runs the function on each completion.
-doCompleted :: Signal a -> (() -> IO ()) -> Signal a
+doCompleted :: Signal a -> IO () -> Signal a
 doCompleted s f =
     let f' (Just x) = return ()
-        f' Nothing = f ()
+        f' Nothing = f
     in doEvent s f'
 
 -- | Returns a signal of the first @n@ elements.
