@@ -59,3 +59,8 @@ testDoNext = do
     hello
         `doNext` (\_ -> putStrLn "next")
         `subscribe` putSub
+
+testDoCompleted = do
+    hello
+        `doCompleted` (\_ -> putStrLn "completed")
+        `subscribe` putSub
