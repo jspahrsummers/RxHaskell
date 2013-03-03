@@ -79,3 +79,10 @@ testZip = do
 
     mzip (fromFoldable ["foo", "bar"]) (fromFoldable ["buzz", "baz"])
         >>: zipSub
+
+testMaterialize = do
+    (materialize hello)
+        >>: putStrLn . show
+
+    (dematerialize (materialize hello))
+        >>: putStrLn . show

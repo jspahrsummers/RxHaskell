@@ -1,6 +1,8 @@
 {-# LANGUAGE Safe #-}
 
 module Signal.Operators ( fromFoldable
+                        , materialize
+                        , dematerialize
                         , filter
                         , doEvent
                         , doNext
@@ -19,6 +21,23 @@ import Subscriber
 -- | Turns any Foldable into a signal.
 fromFoldable :: Foldable t => t a -> Signal a
 fromFoldable = foldMap return
+
+-- | Treats every signal event as a 'NextEvent' containing the event itself.
+-- | This can be used to make all signal events bindable.
+materialize :: Signal a -> Signal (Event a)
+materialize s =
+    signal $ \sub ->
+        let onEvent CompletedEvent = send sub (NextEvent CompletedEvent) >> send sub CompletedEvent
+            onEvent ev = send sub $ NextEvent ev
+        in s >>: onEvent
+
+-- | The inverse of 'materialize'.
+dematerialize :: Signal (Event a) -> Signal a
+dematerialize s =
+    signal $ \sub ->
+        let onEvent (NextEvent ev) = send sub ev
+            onEvent _ = return ()
+        in s >>: onEvent
 
 -- | Filters the values of a signal according to a predicate.
 filter :: Signal a -> (a -> Bool) -> Signal a
