@@ -2,56 +2,74 @@
 
 module Subscriber ( Subscriber
                   , subscriber
-                  , sendNext
-                  , sendError
-                  , sendCompleted
+                  , send
+                  , OnEvent
                   ) where
 
-import Control.Exception
-import Data.IORef
+import Control.Applicative
+import Control.Concurrent
+import Control.Concurrent.STM
+import Data.Word
+import Disposable
+import Event
 
--- | A function to run when a signal sends a value.
-type OnNext a = a -> IO ()
-
--- | A function to run when an exception is thrown from within a signal.
-type OnError = SomeException -> IO ()
-
--- | A function to run when a signal completes successfully.
-type OnCompleted = IO ()
+-- | A function to run when a signal sends an event.
+type OnEvent a = Event a -> IO ()
 
 -- | Receives events from a signal.
 data Subscriber a = Subscriber {
-    onNext :: OnNext a,
-    onError :: OnError,
-    onCompleted :: OnCompleted,
-    disposed :: IORef Bool
+    onEvent :: OnEvent a,
+    disposable :: Disposable,
+    lockedThread :: TVar ThreadId,
+    threadLockCounter :: TVar Word32
 }
 
 -- | Constructs a subscriber.
-subscriber :: OnNext a -> OnError -> OnCompleted -> IO (Subscriber a)
-subscriber next error completed = do
-    d <- newIORef False
+subscriber :: OnEvent a -> IO (Subscriber a)
+subscriber f = do
+    d <- newDisposable $ return ()
 
-    return $ Subscriber { onNext = next
-                        , onError = error
-                        , onCompleted = completed
-                        , disposed = d
-                        }
+    tid <- myThreadId
+    lt <- atomically $ newTVar tid
+    tlc <- atomically $ newTVar 0
 
--- | Sends a value to a subscriber.
-sendNext :: Subscriber a -> a -> IO ()
-sendNext s x = do
-    d <- readIORef $ disposed s
-    if d then return () else onNext s x
+    return $ Subscriber {
+        onEvent = f,
+        disposable = d,
+        lockedThread = lt,
+        threadLockCounter = tlc
+    }
 
--- | Sends an error to a subscriber.
-sendError :: Exception e => Subscriber a -> e -> IO ()
-sendError s e = do
-    d <- atomicModifyIORef (disposed s) $ \d -> (True, d)
-    if d then return () else onError s $ toException e
+-- | Acquires a subscriber for the specified thread.
+acquireSubscriber :: Subscriber a -> ThreadId -> STM ()
+acquireSubscriber sub tid = do
+    tlc <- readTVar (threadLockCounter sub)
+    lt <- readTVar (lockedThread sub)
+    if tlc > 0 && lt /= tid then retry else return ()
 
--- | Sends @completed@ to a subscriber.
-sendCompleted :: Subscriber a -> IO ()
-sendCompleted s = do
-    d <- atomicModifyIORef (disposed s) $ \d -> (True, d)
-    if d then return () else onCompleted s
+    writeTVar (lockedThread sub) tid
+    writeTVar (threadLockCounter sub) $ tlc + 1
+
+-- | Releases a subscriber from the specified thread's ownership.
+releaseSubscriber :: Subscriber a -> ThreadId -> STM ()
+releaseSubscriber sub tid = do
+    always $ fmap (== tid) $ readTVar (lockedThread sub)
+
+    tlc <- readTVar (threadLockCounter sub)
+    always $ return $ tlc > 0
+
+    writeTVar (threadLockCounter sub) $ tlc - 1
+
+-- | Sends an event to a subscriber.
+send :: Subscriber a -> Event a -> IO ()
+send s ev =
+    let send' s ev@(NextEvent _) = onEvent s ev
+        send' s ev = dispose (disposable s) >> onEvent s ev
+    in do
+        tid <- myThreadId
+        atomically $ acquireSubscriber s tid
+        send' s ev
+        atomically $ releaseSubscriber s tid
+
+instance Eq (Subscriber a) where
+    a == b = (disposable a) == (disposable b)

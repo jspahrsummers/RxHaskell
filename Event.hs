@@ -1,5 +1,4 @@
 {-# LANGUAGE Safe #-}
-{-# LANGUAGE ExistentialQuantification #-}
 
 module Event ( Event(..)
              ) where
