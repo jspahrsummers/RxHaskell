@@ -2,9 +2,9 @@
 
 module Subject (subject) where
 
-import Control.Concurrent.MVar
 import Data.Foldable
 import Data.Functor
+import Data.IORef
 import Data.Sequence as Seq
 import Prelude hiding (sequence_)
 import Signal
@@ -13,10 +13,10 @@ import Signal
 -- | Sending values on the subscriber will deliver them to all of the signal's subscribers.
 subject :: IO (Subscriber a, Signal a)
 subject = do
-    subj <- newMVar Seq.empty
+    subj <- newIORef Seq.empty
 
     let s = signal $ \sub ->
-                modifyMVar_ subj $ return . flip (|>) sub
-        sub m = readMVar subj >>= sequence_ . fmap (\sub -> sub m)
+                atomicModifyIORef subj $ \seq -> (seq |> sub, ())
+        sub m = readIORef subj >>= sequence_ . fmap (\sub -> sub m)
 
     return (sub, s)
