@@ -17,6 +17,6 @@ subject = do
 
     let s = signal $ \sub ->
                 atomicModifyIORef subj $ \seq -> (seq |> sub, ())
-        sub m = readIORef subj >>= sequence_ . fmap (\sub -> sub m)
+        sub m = readIORef subj >>= sequence_ . fmap (flip ($) m)
 
     return (sub, s)
