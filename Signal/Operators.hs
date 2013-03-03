@@ -46,11 +46,19 @@ take s n =
     signal $ \sub -> do
         remRef <- newIORef n
 
-        s >>: \m -> do
-            old <- atomicModifyIORef remRef $ \rem ->
-                if rem == 0 then (0, 0) else (rem - 1, rem)
+        let onNext Nothing = do
+                b <- atomicModifyIORef remRef $ \rem ->
+                    (0, if rem == 0 then False else True)
 
-            case old of
-                0 -> return ()
-                1 -> sub m >> sub Nothing
-                _ -> sub m
+                if b then sub Nothing else return ()
+
+            onNext (Just v) = do
+                old <- atomicModifyIORef remRef $ \rem ->
+                    if rem == 0 then (0, 0) else (rem - 1, rem)
+
+                case old of
+                    0 -> return ()
+                    1 -> sub (Just v) >> sub Nothing
+                    _ -> sub (Just v)
+
+        s >>: onNext
