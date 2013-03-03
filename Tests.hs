@@ -2,7 +2,7 @@ module Tests where
 
 import Control.Monad
 import Data.Monoid
-import Prelude hiding (filter)
+import Prelude hiding (filter, take)
 import Signal
 import Signal.Operators
 import Subject
@@ -58,4 +58,11 @@ testFilter = do
 testDoNext = do
     hello
         `doNext` (\_ -> putStrLn "next")
+        >>: putSub
+
+testTake = do
+    hello
+        `mappend` world
+        `mappend` hello
+        `take` 2
         >>: putSub
