@@ -7,55 +7,55 @@ import Signal
 import Signal.Operators
 import Subject
 
-s =
+hello =
     signal $ \sub -> do
         sub $ Just "hello"
         sub Nothing
 
-s' =
+world =
     signal $ \sub -> do
         sub $ Just "world"
         sub Nothing
 
-sub = putStrLn . show
+putSub = putStrLn . show
 
 testBinding =
     let ss =
             signal $ \sub -> do
-                sub $ Just s
-                sub $ Just s'
+                sub $ Just hello
+                sub $ Just world
                 sub Nothing
-    in join ss `subscribe` sub
+    in join ss `subscribe` putSub
 
 testSequencing = do
-    (s >> s') `subscribe` sub
-    (s' >> s) `subscribe` sub
+    (hello >> world) `subscribe` putSub
+    (world >> hello) `subscribe` putSub
 
 testAppending = do
-    s
+    hello
         `mappend` mempty
-        `subscribe` sub
+        `subscribe` putSub
 
-    s
-        `mappend` s'
-        `subscribe` sub
+    hello
+        `mappend` world
+        `subscribe` putSub
 
-    s'
-        `mappend` s
-        `subscribe` sub
+    world
+        `mappend` hello
+        `subscribe` putSub
 
 testSubject = do
-    (subj, s'') <- subject
-    s'' `subscribe` sub
+    (subj, s) <- subject
+    s `subscribe` putSub
     subj $ Just "hello world"
 
 testFilter = do
-    s
-        `mappend` s'
+    hello
+        `mappend` world
         `filter` (\(x:xs) -> x == 'h')
-        `subscribe` sub
+        `subscribe` putSub
 
 testDoNext = do
-    s
+    hello
         `doNext` (\_ -> putStrLn "next")
-        `subscribe` sub
+        `subscribe` putSub
