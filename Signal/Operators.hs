@@ -1,12 +1,15 @@
 {-# LANGUAGE Safe #-}
 
 module Signal.Operators ( filter
+                        , doEvent
                         , doNext
+                        , doCompleted
                         , take
                         ) where
 
 import Data.IORef
 import Data.Monoid
+import Data.Maybe (isJust, isNothing)
 import Prelude hiding (filter, take)
 import Signal
 
@@ -16,12 +19,26 @@ filter s f =
     let f' x = if f x then return x else mempty
     in s >>= f'
 
--- | Runs a function on each event.
-doNext :: Signal a -> (Maybe a -> IO ()) -> Signal a
-doNext s f =
+-- | Runs the function whenever signal sends an event.
+doEvent :: Signal a -> (Maybe a -> IO ()) -> Signal a
+doEvent s f =
     signal $ \sub ->
-        let onNext m = f m >> sub m
-        in s >>: onNext
+        let onEvent m = f m >> sub m
+        in s >>: onEvent
+
+-- | Runs a function on each value.
+doNext :: Signal a -> (a -> IO ()) -> Signal a
+doNext s f =
+    let f' (Just x) = f x
+        f' Nothing = return ()
+    in doEvent s f'
+
+-- | Runs the function on each completion.
+doCompleted :: Signal a -> (() -> IO ()) -> Signal a
+doCompleted s f =
+    let f' (Just x) = return ()
+        f' Nothing = f ()
+    in doEvent s f'
 
 -- | Returns a signal of the first @n@ elements.
 take :: Integral n => Signal a -> n -> Signal a
