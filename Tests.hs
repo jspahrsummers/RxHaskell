@@ -10,17 +10,8 @@ import Signal.Operators
 import Subject
 import Subscriber
 
-hello =
-    signal $ \sub -> do
-        send sub $ NextEvent "hello"
-        send sub CompletedEvent
-        return Disposable.empty
-
-world =
-    signal $ \sub -> do
-        send sub $ NextEvent "world"
-        send sub CompletedEvent
-        return Disposable.empty
+hello = fromFoldable ["hello"]
+world = fromFoldable ["world"]
 
 putSub = putStrLn . show
 
@@ -77,8 +68,6 @@ testDoCompleted = do
         >>: putSub
 
 testTake = do
-    hello
-        `mappend` world
-        `mappend` hello
+    fromFoldable ["foo", "bar", "buzz", "baz"]
         `take` 2
         >>: putSub

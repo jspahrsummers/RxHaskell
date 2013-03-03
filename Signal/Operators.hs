@@ -1,18 +1,24 @@
 {-# LANGUAGE Safe #-}
 
-module Signal.Operators ( filter
+module Signal.Operators ( fromFoldable
+                        , filter
                         , doEvent
                         , doNext
                         , doCompleted
                         , take
                         ) where
 
+import Data.Foldable
 import Data.IORef
 import Data.Monoid
 import Event
 import Prelude hiding (filter, take)
 import Signal
 import Subscriber
+
+-- | Turns any Foldable into a signal.
+fromFoldable :: Foldable t => t a -> Signal a
+fromFoldable = foldMap return
 
 -- | Filters the values of a signal according to a predicate.
 filter :: Signal a -> (a -> Bool) -> Signal a
