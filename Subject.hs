@@ -1,6 +1,6 @@
 {-# LANGUAGE Safe #-}
 
-module Subject ( subject
+module Subject ( newSubject
                ) where
 
 import Data.Foldable
@@ -16,8 +16,8 @@ import Subscriber
 
 -- | Creates a controllable signal, represented by a subscriber (a.k.a. sink) and signal pair.
 -- | Sending values on the subscriber will deliver them to all of the signal's subscribers.
-subject :: IO (Subscriber a, Signal a)
-subject = do
+newSubject :: IO (Subscriber a, Signal a)
+newSubject = do
     subj <- newIORef Seq.empty
 
     let s =

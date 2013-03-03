@@ -42,7 +42,7 @@ testAppending = do
         >>: print
 
 testSubject = do
-    (subj, s) <- subject
+    (subj, s) <- newSubject
     s >>: print
     send subj $ NextEvent "hello world"
 
