@@ -9,7 +9,6 @@ module Disposable ( Disposable
                   ) where
 
 import Control.Applicative ((<$), (<$>))
-import Control.Concurrent.MVar
 import Control.Monad
 import Data.IORef
 
@@ -18,7 +17,7 @@ type DisposableList = (Bool, [Disposable])
 
 -- | Represents an operation which can be canceled or a resource which can be freed.
 data Disposable = ActionDisposable (IO ()) (IORef Bool)
-                | CompositeDisposable (MVar DisposableList)
+                | CompositeDisposable (IORef DisposableList)
                 | EmptyDisposable
 
 -- | Disposes a disposable. Returns whether it was already disposed.
@@ -32,10 +31,10 @@ dispose (ActionDisposable action d) = do
 
 dispose (CompositeDisposable dl) = 
     let disposedList = (True, [])
-        modify (True, _) = return (disposedList, disposedList)
-        modify (False, xs) = return (disposedList, (False, xs))
+        modify (True, _) = (disposedList, disposedList)
+        modify (False, xs) = (disposedList, (False, xs))
     in do
-        (b, xs) <- modifyMVar dl modify
+        (b, xs) <- atomicModifyIORef dl modify
         unless b $ mapM_ dispose xs
         return b
 
@@ -45,15 +44,15 @@ newDisposable action = ActionDisposable action <$> newIORef False
 
 -- | Creates a disposable which can dispose of other disposables.
 newCompositeDisposable :: IO Disposable
-newCompositeDisposable = CompositeDisposable <$> newMVar (False, [])
+newCompositeDisposable = CompositeDisposable <$> newIORef (False, [])
 
 -- | Adds disposable @d@ to the composite disposable.
 addDisposable :: Disposable -> Disposable -> IO ()
 addDisposable (CompositeDisposable dl) d =
-    let modify (True, _) = return ((True, []), True)
-        modify (False, xs) = return ((False, d : xs), False)
+    let modify (True, _) = ((True, []), True)
+        modify (False, xs) = ((False, d : xs), False)
     in do
-        b <- modifyMVar dl modify
+        b <- atomicModifyIORef dl modify
         when b $ dispose d >> return ()
 
 -- | Returns a disposable which does no work.
