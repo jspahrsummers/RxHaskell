@@ -18,4 +18,4 @@ doNext :: Signal a -> (Maybe a -> IO ()) -> Signal a
 doNext s f =
     signal $ \sub ->
         let onNext m = f m >> sub m
-        in s `subscribe` onNext
+        in s >>: onNext

@@ -61,23 +61,23 @@ instance Monad Signal where
                 onOuterNext Nothing = decSubscribers
                 onOuterNext (Just v) = do
                     atomicModifyIORef sc $ \n -> (n + 1, ())
-                    f v `subscribe` onInnerNext
+                    f v >>: onInnerNext
 
-            s `subscribe` onOuterNext
+            s >>: onOuterNext
 
     a >> b =
         signal $ \sub ->
-            let onNext Nothing = b `subscribe` sub
+            let onNext Nothing = b >>: sub
                 onNext _ = return ()
-            in a `subscribe` onNext
+            in a >>: onNext
 
 instance Monoid (Signal a) where
     mempty = signal $ \sub -> sub Nothing
     a `mappend` b =
         signal $ \sub ->
-            let onNext Nothing = b `subscribe` sub
+            let onNext Nothing = b >>: sub
                 onNext m = sub m
-            in a `subscribe` onNext
+            in a >>: onNext
 
 instance Functor Signal where
     fmap f s = s >>= return . f
