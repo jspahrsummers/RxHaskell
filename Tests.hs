@@ -40,3 +40,7 @@ testSubject = do
 testFilter = do
     let s'' = s `mappend` s' `Op.filter` (\(x:xs) -> x == 'h')
     subscribe s'' sub
+
+testDoNext = do
+    let s'' = s `Op.doNext` \_ -> putStrLn "next"
+    subscribe s'' sub
