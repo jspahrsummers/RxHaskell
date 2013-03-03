@@ -5,6 +5,7 @@ module Signal ( Subscriber
               , signal
               , subscribe
               , (>>:)
+              , never
               ) where
 
 import Control.Monad
@@ -26,6 +27,9 @@ signal
     -> Signal a                -- ^ The constructed signal.
 
 signal = Signal
+
+-- | Returns a signal which never sends any events.
+never = signal $ const $ return ()
 
 -- | Subscribes to a signal.
 subscribe :: Signal a -> Subscriber a -> IO ()
