@@ -121,7 +121,7 @@ switch s =
                 let onInnerEvent ev@(NextEvent _) = send sub ev
                     onInnerEvent ev@(ErrorEvent _) = send sub ev >> updateCurrent D.empty
                     onInnerEvent CompletedEvent = updateCurrent D.empty
-                in e >>: onInnerEvent >>= D.addDisposable ds
+                in e >>: onInnerEvent >>= updateCurrent
 
             onEvent (ErrorEvent e) = send sub $ ErrorEvent e
             onEvent CompletedEvent = send sub CompletedEvent
