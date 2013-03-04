@@ -8,11 +8,8 @@ module Signal.Operators ( fromFoldable
                         , doNext
                         , doCompleted
                         , take
-<<<<<<< HEAD
                         , drop
-=======
                         , switch
->>>>>>> added switch
                         ) where
 
 import Control.Monad
@@ -20,12 +17,8 @@ import Data.Foldable
 import Data.IORef
 import Data.Monoid
 import Event
-<<<<<<< HEAD
 import Prelude hiding (filter, take, drop)
-=======
 import qualified Disposable as D
-import Prelude hiding (filter, take)
->>>>>>> added switch
 import Signal
 import Subscriber
 
