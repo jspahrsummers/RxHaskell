@@ -103,6 +103,15 @@ instance Monoid (Signal a) where
             a >>: onEvent >>= addDisposable cd
             return cd
 
+instance MonadPlus Signal where
+    mzero = mempty
+    a `mplus` b =
+        join $ signal $ \sub -> do
+            send sub $ NextEvent a
+            send sub $ NextEvent b
+            send sub CompletedEvent
+            return Disposable.empty
+
 instance Functor Signal where
     fmap = liftM
 

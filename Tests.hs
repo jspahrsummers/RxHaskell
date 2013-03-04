@@ -43,9 +43,9 @@ testAppending = do
         >>: print
 
 testSubject = do
-    (subj, s) <- newSubject
-    s >>: print
-    send subj $ NextEvent "hello world"
+    (sub, sig) <- newSubject
+    sig >>: print
+    send sub $ NextEvent "hello world"
 
 testFilter = do
     hello
@@ -105,3 +105,16 @@ testScheduledSignal = do
         send sub $ NextEvent "bar"
         send sub CompletedEvent
     sig >>: print
+
+testMerging = do
+    (sub, sig) <- newSubject
+    (sub', sig') <- newSubject
+
+    sig `mplus` sig' >>: print
+
+    send sub $ NextEvent "foo"
+    send sub' $ NextEvent "bar"
+    send sub $ NextEvent "fuzz"
+    send sub $ CompletedEvent
+    send sub' $ NextEvent "buzz"
+    send sub' $ CompletedEvent
