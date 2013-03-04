@@ -8,7 +8,11 @@ module Signal.Operators ( fromFoldable
                         , doNext
                         , doCompleted
                         , take
+<<<<<<< HEAD
                         , drop
+=======
+                        , switch
+>>>>>>> added switch
                         ) where
 
 import Control.Monad
@@ -16,7 +20,12 @@ import Data.Foldable
 import Data.IORef
 import Data.Monoid
 import Event
+<<<<<<< HEAD
 import Prelude hiding (filter, take, drop)
+=======
+import qualified Disposable as D
+import Prelude hiding (filter, take)
+>>>>>>> added switch
 import Signal
 import Subscriber
 
@@ -104,3 +113,24 @@ drop s n =
             onEvent ev = send sub ev
 
         s >>: onEvent
+
+switch :: Signal (Signal a) -> Signal a
+switch s =
+    signal $ \sub -> do
+        currRef <- newIORef D.empty
+        ds <- D.newCompositeDisposable
+
+        let updateCurrent nd = do
+                _ <- atomicModifyIORef currRef $ \od -> (nd, D.dispose od)
+                D.addDisposable ds nd
+
+            onEvent (NextEvent e) =
+                let onInnerEvent ev@(NextEvent _) = send sub ev
+                    onInnerEvent ev@(ErrorEvent _) = send sub ev >> updateCurrent D.empty
+                    onInnerEvent CompletedEvent = updateCurrent D.empty
+                in e >>: onInnerEvent >>= D.addDisposable ds
+
+            onEvent (ErrorEvent e) = send sub $ ErrorEvent e
+            onEvent CompletedEvent = send sub CompletedEvent
+
+        s >>: onEvent >>= D.addDisposable ds >> return ds

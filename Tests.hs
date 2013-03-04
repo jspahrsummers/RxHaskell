@@ -118,3 +118,7 @@ testMerging = do
     send sub $ CompletedEvent
     send sub' $ NextEvent "buzz"
     send sub' $ CompletedEvent
+
+testSwitch =
+    let hello = fromFoldable [fromFoldable ["hello"], fromFoldable ["world"], fromFoldable ["how's", "things?"]]
+    in switch hello >>: print
