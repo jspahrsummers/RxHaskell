@@ -88,6 +88,13 @@ instance Monad Signal where
             a >>: onEvent >>= addDisposable cd
             return cd
 
+instance Functor Signal where
+    fmap = liftM
+
+instance Applicative Signal where
+    pure = return
+    (<*>) = ap
+
 instance Monoid (Signal a) where
     mempty =
         signal $ \sub ->
@@ -111,9 +118,6 @@ instance MonadPlus Signal where
             send sub $ NextEvent b
             send sub CompletedEvent
             return Disposable.empty
-
-instance Functor Signal where
-    fmap = liftM
 
 instance MonadZip Signal where
     a `mzip` b =
