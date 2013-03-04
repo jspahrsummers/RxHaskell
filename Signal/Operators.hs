@@ -8,6 +8,7 @@ module Signal.Operators ( fromFoldable
                         , doNext
                         , doCompleted
                         , take
+                        , drop
                         ) where
 
 import Control.Monad
@@ -15,7 +16,7 @@ import Data.Foldable
 import Data.IORef
 import Data.Monoid
 import Event
-import Prelude hiding (filter, take)
+import Prelude hiding (filter, take, drop)
 import Signal
 import Subscriber
 
@@ -85,5 +86,21 @@ take s n =
             onEvent ev = do
                 b <- atomicModifyIORef remRef $ \rem -> (0, rem /= 0)
                 when b $ send sub ev
+
+        s >>: onEvent
+
+-- | Returns a signal without the first @n@ elements.
+drop :: Integral n => Signal a -> n -> Signal a
+drop s n =
+    signal $ \sub -> do
+        remRef <- newIORef n
+
+        let onEvent ev@(NextEvent _) = do
+                old <- atomicModifyIORef remRef $ \rem ->
+                    if rem == 0 then (0, 0) else (rem - 1, rem)
+
+                when (old == 0) $ send sub ev
+
+            onEvent ev = send sub ev
 
         s >>: onEvent

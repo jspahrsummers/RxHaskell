@@ -3,7 +3,7 @@ module Tests where
 import Control.Monad
 import Control.Monad.Zip
 import Data.Monoid
-import Prelude hiding (filter, take)
+import Prelude hiding (filter, take, drop)
 import Disposable
 import Event
 import Scheduler
@@ -71,6 +71,11 @@ testDoCompleted = do
 testTake = do
     fromFoldable ["foo", "bar", "buzz", "baz"]
         `take` 2
+        >>: print
+
+testDrop = do
+    fromFoldable ["foo", "bar", "buzz", "baz"]
+        `drop` 2
         >>: print
 
 testZip = do
