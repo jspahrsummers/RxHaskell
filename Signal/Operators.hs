@@ -114,18 +114,15 @@ switch s =
         ds <- D.newCompositeDisposable
         actives <- newIORef (True, False) -- Outer, Inner
 
-        let modifyInnerActive act = do
-                _ <- atomicModifyIORef actives $ \(outer, inner) -> ((outer, act), inner)
-                return ()
+        let modifyInnerActive act = atomicModifyIORef actives $ \(outer, inner) -> ((outer, act), (outer, act))
 
-            completeIfDone = do
-                act <- readIORef actives
+            completeIfDone act = do
                 case act of
                     (False, False) -> send sub CompletedEvent
                     _ -> return ()
 
             onEvent (NextEvent s') = do
-                let onInnerEvent CompletedEvent = modifyInnerActive False >> completeIfDone
+                let onInnerEvent CompletedEvent = modifyInnerActive False >>= completeIfDone
                     onInnerEvent ev = send sub ev
 
                 modifyInnerActive True
@@ -134,7 +131,7 @@ switch s =
             onEvent (ErrorEvent e) = send sub $ ErrorEvent e
 
             onEvent CompletedEvent = do
-                atomicModifyIORef actives $ \(outer, inner) -> ((False, inner), outer)
-                completeIfDone
+                act <- atomicModifyIORef actives $ \(outer, inner) -> ((False, inner), (False, inner))
+                completeIfDone act
 
         s >>: onEvent >>= D.addDisposable ds >> return ds
