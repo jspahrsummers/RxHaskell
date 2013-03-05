@@ -124,13 +124,13 @@ switch s =
                     (False, False) -> send sub CompletedEvent
                     _ -> return ()
 
-            onEvent (NextEvent e) = do
+            onEvent (NextEvent s') = do
                 let onInnerEvent ev@(NextEvent _) = send sub ev
                     onInnerEvent ev@(ErrorEvent _) = send sub ev
                     onInnerEvent CompletedEvent = modifyInnerActive False >> completeIfDone
 
                 modifyInnerActive True
-                e >>: onInnerEvent >>= D.addDisposable ds
+                s' >>: onInnerEvent >>= D.addDisposable ds
 
             onEvent (ErrorEvent e) = send sub $ ErrorEvent e
 
