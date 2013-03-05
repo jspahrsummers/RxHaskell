@@ -107,23 +107,35 @@ drop s n =
 
         s >>: onEvent
 
+-- | Returns a signal that sends the values from the most recently sent signal.
 switch :: Signal (Signal a) -> Signal a
 switch s =
     signal $ \sub -> do
-        currRef <- newIORef D.empty
         ds <- D.newCompositeDisposable
+        actives <- newIORef (True, False) -- Outer, Inner
 
-        let updateCurrent nd = do
-                _ <- atomicModifyIORef currRef $ \od -> (nd, D.dispose od)
-                D.addDisposable ds nd
+        let modifyInnerActive act = do
+                _ <- atomicModifyIORef actives $ \(outer, inner) -> ((outer, act), inner)
+                return ()
 
-            onEvent (NextEvent e) =
+            completeIfDone = do
+                act <- readIORef actives
+                case act of
+                    (False, False) -> send sub CompletedEvent
+                    _ -> return ()
+
+            onEvent (NextEvent e) = do
                 let onInnerEvent ev@(NextEvent _) = send sub ev
-                    onInnerEvent ev@(ErrorEvent _) = send sub ev >> updateCurrent D.empty
-                    onInnerEvent CompletedEvent = updateCurrent D.empty
-                in e >>: onInnerEvent >>= updateCurrent
+                    onInnerEvent ev@(ErrorEvent _) = send sub ev
+                    onInnerEvent CompletedEvent = modifyInnerActive False >> completeIfDone
+
+                modifyInnerActive True
+                e >>: onInnerEvent >>= D.addDisposable ds
 
             onEvent (ErrorEvent e) = send sub $ ErrorEvent e
-            onEvent CompletedEvent = send sub CompletedEvent
+
+            onEvent CompletedEvent = do
+                atomicModifyIORef actives $ \(outer, inner) -> ((False, inner), outer)
+                completeIfDone
 
         s >>: onEvent >>= D.addDisposable ds >> return ds
