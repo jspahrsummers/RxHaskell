@@ -118,10 +118,8 @@ switch s =
             modifyActives (Nothing, Just ni) = atomicModifyIORef actives $ \(outer, _) -> ((outer, ni), (outer, ni))
             modifyActives (Just no, Nothing) = atomicModifyIORef actives $ \(_, inner) -> ((no, inner), (no, inner))
 
-            completeIfDone act = do
-                case act of
-                    (False, False) -> send sub CompletedEvent
-                    _ -> return ()
+            completeIfDone (False, False) = send sub CompletedEvent
+            completeIfDone _ = return ()
 
             onEvent (NextEvent s') = do
                 let onInnerEvent CompletedEvent = modifyActives (Nothing, Just False) >>= completeIfDone
