@@ -10,8 +10,10 @@ module Signal.Operators ( fromFoldable
                         , take
                         , drop
                         , switch
+                        , combine
                         ) where
 
+import Control.Concurrent.STM
 import Control.Monad
 import Data.Foldable
 import Data.IORef
@@ -136,4 +138,44 @@ switch s =
             onEvent CompletedEvent = modifyActives (Just False, Nothing) >>= completeIfDone
 
         s >>: onEvent >>= addDisposable cd
+        return cd
+
+-- | Combines the latest values sent by both signals.
+combine :: Signal a -> Signal b -> Signal (a, b)
+combine a b =
+    signal $ \sub -> do
+        aVal <- atomically $ newTVar Nothing
+        aDone <- atomically $ newTVar False
+
+        bVal <- atomically $ newTVar Nothing
+        bDone <- atomically $ newTVar False
+
+        cd <- newCompositeDisposable
+
+        let completed = do
+                ac <- readTVar aDone
+                bc <- readTVar bDone
+                return $ if (ac && bc) then Just CompletedEvent else Nothing
+
+            onEvent' _ _ (ErrorEvent e) = return $ Just $ ErrorEvent e
+            onEvent' _ done CompletedEvent = writeTVar done True >> completed
+            onEvent' val _ (NextEvent x) = do
+                writeTVar val $ Just x
+
+                av <- readTVar aVal
+                bv <- readTVar bVal
+
+                case (av, bv) of
+                    (Just ax, Just bx) -> return $ Just $ NextEvent (ax, bx)
+                    _ -> return Nothing
+
+            onEvent val done ev = do
+                m <- atomically $ onEvent' val done ev
+                case m of
+                    (Just ev) -> send sub ev
+                    Nothing -> return ()
+
+        a >>: onEvent aVal aDone >>= addDisposable cd
+        b >>: onEvent bVal bDone >>= addDisposable cd
+
         return cd

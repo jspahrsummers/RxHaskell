@@ -130,17 +130,17 @@ instance MonadZip Signal where
 
             cd <- newCompositeDisposable
 
-            let completed :: (TVar (Seq a), TVar Bool) -> (TVar (Seq b), TVar Bool) -> STM [Event (x, y)]
-                completed (vals, done) (otherVals, otherDone) = do
-                    vc <- readTVar done
-                    vl <- length <$> readTVar vals
+            let completed :: STM [Event (x, y)]
+                completed = do
+                    ac <- readTVar aDone
+                    al <- length <$> readTVar aVals
 
-                    oc <- readTVar otherDone
-                    ol <- length <$> readTVar otherVals
+                    bc <- readTVar bDone
+                    bl <- length <$> readTVar bVals
 
-                    return $ if (vc && vl == 0) || (oc && ol == 0) then [CompletedEvent] else []
+                    return $ if (ac && al == 0) || (bc && bl == 0) then [CompletedEvent] else []
                 
-                onEvent' :: (TVar (Seq a), TVar Bool) -> (TVar (Seq b), TVar Bool) -> (Seq a -> Seq b -> Seq (x, y)) -> Event a -> STM [Event (x, y)]
+                onEvent' :: (TVar (Seq x), TVar Bool) -> (TVar (Seq y), TVar Bool) -> (Seq x -> Seq y -> Seq (a, b)) -> Event x -> STM [Event (a, b)]
                 onEvent' vt@(vals, _) ot@(otherVals, _) f (NextEvent v) = do
                     modifyTVar' vals (|> v)
 
@@ -152,11 +152,11 @@ instance MonadZip Signal where
                             modifyTVar' vals $ drop 1
                             modifyTVar' otherVals $ drop 1
                             
-                            (:) (NextEvent t) <$> completed vt ot
+                            (:) (NextEvent t) <$> completed
 
                         _ -> return []
 
-                onEvent' vt@(vals, done) ot _ CompletedEvent = completed vt ot
+                onEvent' (_, done) _ _ CompletedEvent = writeTVar done True >> completed
                 onEvent' _ _ _ (ErrorEvent e) = return [ErrorEvent e]
 
                 onEvent vt ot f ev = do

@@ -132,3 +132,16 @@ testSwitch = do
     send innerSub $ NextEvent "3"
     
     send innerSub CompletedEvent
+
+testCombine = do
+    (sub, sig) <- newSubject
+    (sub', sig') <- newSubject
+
+    sig `combine` sig' >>: print
+
+    send sub $ NextEvent "foo"
+    send sub' $ NextEvent "bar"
+    send sub' $ NextEvent "fuzz"
+    send sub' $ CompletedEvent
+    send sub $ NextEvent "buzz"
+    send sub $ CompletedEvent
