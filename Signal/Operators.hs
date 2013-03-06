@@ -18,7 +18,7 @@ import Data.IORef
 import Data.Monoid
 import Event
 import Prelude hiding (filter, take, drop)
-import qualified Disposable as D
+import Disposable
 import Signal
 import Subscriber
 
@@ -111,7 +111,7 @@ drop s n =
 switch :: Signal (Signal a) -> Signal a
 switch s =
     signal $ \sub -> do
-        ds <- D.newCompositeDisposable
+        cd <- newCompositeDisposable
         actives <- newIORef (True, False) -- Outer, Inner
 
         let modifyActives (Nothing, Just ni) = atomicModifyIORef actives $ \(outer, _) -> ((outer, ni), (outer, ni))
@@ -130,4 +130,5 @@ switch s =
             onEvent (ErrorEvent e) = send sub $ ErrorEvent e
             onEvent CompletedEvent = modifyActives (Just False, Nothing) >>= completeIfDone
 
-        s >>: onEvent >>= D.addDisposable ds >> return ds
+        s >>: onEvent >>= addDisposable cd
+        return cd
