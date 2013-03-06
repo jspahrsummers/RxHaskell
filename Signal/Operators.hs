@@ -9,6 +9,7 @@ module Signal.Operators ( fromFoldable
                         , doCompleted
                         , take
                         , drop
+                        , switch
                         ) where
 
 import Control.Monad
@@ -17,6 +18,7 @@ import Data.IORef
 import Data.Monoid
 import Event
 import Prelude hiding (filter, take, drop)
+import Disposable
 import Signal
 import Subscriber
 
@@ -104,3 +106,34 @@ drop s n =
             onEvent ev = send sub ev
 
         s >>: onEvent
+
+-- | Returns a signal that sends the values from the most recently sent signal.
+switch :: Signal (Signal a) -> Signal a
+switch s =
+    signal $ \sub -> do
+        cd <- newCompositeDisposable
+        actives <- newIORef (True, False) -- Outer, Inner
+        currD <- newIORef empty
+
+        let modifyActives (Nothing, Just ni) = atomicModifyIORef actives $ \(outer, _) -> ((outer, ni), (outer, ni))
+            modifyActives (Just no, Nothing) = atomicModifyIORef actives $ \(_, inner) -> ((no, inner), (no, inner))
+
+            completeIfDone (False, False) = send sub CompletedEvent
+            completeIfDone _ = return ()
+
+            onEvent (NextEvent s') = do
+                let onInnerEvent CompletedEvent = modifyActives (Nothing, Just False) >>= completeIfDone
+                    onInnerEvent ev = send sub ev
+
+                modifyActives (Nothing, Just True)
+                nd <- s' >>: onInnerEvent
+                addDisposable cd nd
+                oldD <- atomicModifyIORef currD $ \oldD -> (nd, oldD)
+                dispose oldD
+                return ()
+
+            onEvent (ErrorEvent e) = send sub $ ErrorEvent e
+            onEvent CompletedEvent = modifyActives (Just False, Nothing) >>= completeIfDone
+
+        s >>: onEvent >>= addDisposable cd
+        return cd
