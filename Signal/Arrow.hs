@@ -7,9 +7,12 @@ module Signal.Arrow ( SignalArrow
 import Control.Arrow
 import Control.Category
 import Control.Monad
+import Control.Monad.Fix
 import Event
 import Prelude hiding ((.), id)
 import Signal
+import Signal.Operators
+import Subject
 
 newtype SignalArrow b c = SignalArrow {
     runSignalArrow :: Signal b -> Signal c
@@ -36,3 +39,17 @@ instance ArrowChoice SignalArrow where
 
             onNext (Right d) = return $ Right d
         in SignalArrow (>>= onNext)
+
+instance ArrowLoop SignalArrow where
+    -- f :: Signal (b, d) -> Signal (c, d)
+    loop (SignalArrow f) =
+        SignalArrow $ \sb ->
+            signal $ \subc -> do
+                (subbd, sbd) <- newSubject
+
+                let scd = f sbd
+                    sc = fmap fst scd
+                    sd = fmap snd scd
+
+                subscribe (fmap fst scd) subc
+                subscribe (sb `combine` sd) subbd
