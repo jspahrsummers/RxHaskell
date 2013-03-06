@@ -113,6 +113,7 @@ switch s =
     signal $ \sub -> do
         cd <- newCompositeDisposable
         actives <- newIORef (True, False) -- Outer, Inner
+        currD <- newIORef empty
 
         let modifyActives (Nothing, Just ni) = atomicModifyIORef actives $ \(outer, _) -> ((outer, ni), (outer, ni))
             modifyActives (Just no, Nothing) = atomicModifyIORef actives $ \(_, inner) -> ((no, inner), (no, inner))
@@ -125,7 +126,11 @@ switch s =
                     onInnerEvent ev = send sub ev
 
                 modifyActives (Nothing, Just True)
-                s' >>: onInnerEvent >>= D.addDisposable ds
+                nd <- s' >>: onInnerEvent
+                addDisposable cd nd
+                oldD <- atomicModifyIORef currD $ \oldD -> (nd, oldD)
+                dispose oldD
+                return ()
 
             onEvent (ErrorEvent e) = send sub $ ErrorEvent e
             onEvent CompletedEvent = modifyActives (Just False, Nothing) >>= completeIfDone
