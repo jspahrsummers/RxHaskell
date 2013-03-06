@@ -114,8 +114,7 @@ switch s =
         ds <- D.newCompositeDisposable
         actives <- newIORef (True, False) -- Outer, Inner
 
-        let modifyActives (Just no, Just ni) = atomicModifyIORef actives $ \(_, _) -> ((no, ni), (no, ni))
-            modifyActives (Nothing, Just ni) = atomicModifyIORef actives $ \(outer, _) -> ((outer, ni), (outer, ni))
+        let modifyActives (Nothing, Just ni) = atomicModifyIORef actives $ \(outer, _) -> ((outer, ni), (outer, ni))
             modifyActives (Just no, Nothing) = atomicModifyIORef actives $ \(_, inner) -> ((no, inner), (no, inner))
 
             completeIfDone (False, False) = send sub CompletedEvent
