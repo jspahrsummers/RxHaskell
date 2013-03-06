@@ -119,6 +119,16 @@ testMerging = do
     send sub' $ NextEvent "buzz"
     send sub' $ CompletedEvent
 
-testSwitch =
-    let hello = fromFoldable [fromFoldable ["hello"], fromFoldable ["world"], fromFoldable ["how's", "things?"]]
-    in switch hello >>: print
+testSwitch = do
+    (outerSub, outerSig) <- newSubject
+    (innerSub, innerSig) <- newSubject
+    switch outerSig >>: print
+
+    send outerSub $ NextEvent $ fromFoldable ["1", "2"]
+    send outerSub $ NextEvent innerSig
+
+    send outerSub CompletedEvent
+
+    send innerSub $ NextEvent "3"
+    
+    send innerSub CompletedEvent
