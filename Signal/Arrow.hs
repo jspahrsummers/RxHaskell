@@ -11,7 +11,7 @@ import Prelude hiding ((.), id)
 import Signal
 
 newtype SignalArrow b c = SignalArrow {
-    runSignalArrow :: (Signal b -> Signal c)
+    runSignalArrow :: Signal b -> Signal c
 }
 
 instance Arrow SignalArrow where

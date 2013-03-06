@@ -115,9 +115,7 @@ switch s =
         actives <- newIORef (True, False) -- Outer, Inner
 
         currD <- newIORef empty
-
-        currD' <- newDisposable $ readIORef currD >>= dispose
-        addDisposable cd currD'
+        newDisposable (readIORef currD >>= dispose) >>= addDisposable cd
 
         let modifyActives (Nothing, Just ni) = atomicModifyIORef actives $ \(outer, _) -> ((outer, ni), (outer, ni))
             modifyActives (Just no, Nothing) = atomicModifyIORef actives $ \(_, inner) -> ((no, inner), (no, inner))
