@@ -127,10 +127,9 @@ switch s =
 
                 modifyActives (Nothing, Just True)
                 nd <- s' >>: onInnerEvent
+
+                atomicModifyIORef currD (\oldD -> (nd, oldD)) >>= dispose
                 addDisposable cd nd
-                oldD <- atomicModifyIORef currD $ \oldD -> (nd, oldD)
-                dispose oldD
-                return ()
 
             onEvent (ErrorEvent e) = send sub $ ErrorEvent e
             onEvent CompletedEvent = modifyActives (Just False, Nothing) >>= completeIfDone
