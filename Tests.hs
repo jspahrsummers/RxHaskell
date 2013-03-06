@@ -118,3 +118,17 @@ testMerging = do
     send sub $ CompletedEvent
     send sub' $ NextEvent "buzz"
     send sub' $ CompletedEvent
+
+testSwitch = do
+    (outerSub, outerSig) <- newSubject
+    (innerSub, innerSig) <- newSubject
+    switch outerSig >>: print
+
+    send outerSub $ NextEvent $ fromFoldable ["1", "2"]
+    send outerSub $ NextEvent innerSig
+
+    send outerSub CompletedEvent
+
+    send innerSub $ NextEvent "3"
+    
+    send innerSub CompletedEvent
