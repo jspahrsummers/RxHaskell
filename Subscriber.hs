@@ -72,12 +72,12 @@ releaseSubscriber sub tid = do
 -- | Sends an event to a subscriber.
 send :: Subscriber a -> Event a -> IO ()
 send s ev =
-    let send' s ev@(NextEvent _) = onEvent s ev
-        send' s ev = do
-            d <- dispose (disposable s)
+    let send' ev@(NextEvent _) = onEvent s ev
+        send' ev = do
+            d <- atomically $ readTVar (disposed s)
             unless d $ onEvent s ev
     in do
         tid <- myThreadId
         b <- atomically $ acquireSubscriber s tid
 
-        when b $ send' s ev >> atomically (releaseSubscriber s tid)
+        when b $ send' ev >> atomically (releaseSubscriber s tid)

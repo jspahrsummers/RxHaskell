@@ -20,14 +20,12 @@ data Disposable = ActionDisposable (IO ()) (IORef Bool)
                 | CompositeDisposable (IORef DisposableList)
                 | EmptyDisposable
 
--- | Disposes a disposable. Returns whether it was already disposed.
-dispose :: Disposable -> IO Bool
-dispose EmptyDisposable = return True
+-- | Disposes a disposable.
+dispose :: Disposable -> IO ()
+dispose EmptyDisposable = return ()
 dispose (ActionDisposable action d) = do
     b <- atomicModifyIORef d $ \b -> (True, b)
-    if b
-        then b <$ action
-        else return b
+    unless b action
 
 dispose (CompositeDisposable dl) = 
     let disposedList = (True, [])
@@ -36,7 +34,6 @@ dispose (CompositeDisposable dl) =
     in do
         (b, xs) <- atomicModifyIORef dl modify
         unless b $ mapM_ dispose xs
-        return b
 
 -- | Creates a disposable which runs the given action upon disposal.
 newDisposable :: IO () -> IO Disposable
@@ -53,7 +50,7 @@ addDisposable (CompositeDisposable dl) d =
         modify (False, xs) = ((False, d : xs), False)
     in do
         b <- atomicModifyIORef dl modify
-        when b $ dispose d >> return ()
+        when b $ dispose d
 
 -- | Returns a disposable which does no work.
 empty :: Disposable
