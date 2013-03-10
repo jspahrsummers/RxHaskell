@@ -6,8 +6,18 @@ module Event ( Event(..)
 import Control.Exception
 
 -- | Represents an event that a signal might send.
-data Event a =
-    NextEvent a |
+data Event v =
+    NextEvent v |
     ErrorEvent IOException |
     CompletedEvent
-    deriving (Eq, Show)
+
+instance Eq v => Eq (Event v) where
+    (NextEvent v) == (NextEvent v') = v == v'
+    (ErrorEvent e) == (ErrorEvent e') = e == e'
+    CompletedEvent == CompletedEvent = True
+    _ == _ = False
+
+instance Show v => Show (Event v) where
+    show (NextEvent v) = "NextEvent " ++ show v
+    show (ErrorEvent e) = "ErrorEvent " ++ show e
+    show CompletedEvent = "CompletedEvent"
