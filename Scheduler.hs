@@ -24,6 +24,8 @@ data Scheduler = Scheduler {
 newScheduler :: IO Scheduler
 newScheduler = do
     q <- atomically newTQueue
+
+    -- TODO: Spawn scheduler threads lazily (when the first action is enqueued).
     tid <- forkIO $ schedulerMain q
 
     return Scheduler {
@@ -39,8 +41,10 @@ schedule s action = do
 
     newDisposable $ atomicModifyIORef ref $ const (True, ())
 
+-- | Executes all current and future actions enqueued on the given scheduler.
 schedulerMain :: TQueue ScheduledAction -> IO ()
 schedulerMain q = do
+    -- TODO: If the queue is empty, we should kill this scheduler's thread until a new action is enqueued.
     (ref, action) <- atomically $ readTQueue q
 
     d <- readIORef ref
