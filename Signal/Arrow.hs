@@ -39,17 +39,3 @@ instance ArrowChoice SignalArrow where
 
             onNext (Right d) = return $ Right d
         in SignalArrow (>>= onNext)
-
-instance ArrowLoop SignalArrow where
-    -- f :: Signal (b, d) -> Signal (c, d)
-    loop (SignalArrow f) =
-        SignalArrow $ \sb ->
-            signal $ \subc -> do
-                (subbd, sbd) <- newSubject
-
-                let scd = f sbd
-                    sc = fmap fst scd
-                    sd = fmap snd scd
-
-                subscribe (fmap fst scd) subc
-                subscribe (sb `combine` sd) subbd

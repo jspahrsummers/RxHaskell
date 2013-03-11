@@ -17,15 +17,3 @@ testConcat = do
 
     (runSignalArrow a) (fromFoldable ["hello", "world"])
         >>: print
-
-testRecursiveConcat = do
-    let a :: SignalArrow String String
-        a =
-            proc x -> do
-            rec
-                foo <- arr id -< bar
-                bar <- arr (++ "bar") -< x
-            returnA -< (foo ++ ":" ++ bar)
-
-    (runSignalArrow a) (fromFoldable ["hello", "world"])
-        >>: print
