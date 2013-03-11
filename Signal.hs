@@ -5,6 +5,7 @@ module Signal ( Signal
               , subscribe
               , (>>:)
               , never
+              , Signal.empty
               ) where
 
 import Control.Applicative
@@ -32,6 +33,11 @@ signal = Signal
 
 -- | Returns a signal which never sends any events.
 never = signal $ const $ return EmptyDisposable
+
+-- | Returns a signal which immediately completes.
+empty =
+    signal $ \sub ->
+        EmptyDisposable <$ send sub CompletedEvent
 
 -- | Subscribes to a signal.
 subscribe :: Signal a -> Subscriber a -> IO Disposable
@@ -85,10 +91,7 @@ instance Applicative Signal where
     (<*>) = ap
 
 instance Monoid (Signal a) where
-    mempty =
-        signal $ \sub ->
-            EmptyDisposable <$ send sub CompletedEvent
-
+    mempty = Signal.empty
     a `mappend` b =
         signal $ \sub -> do
             ds <- newDisposableSet
@@ -100,7 +103,7 @@ instance Monoid (Signal a) where
             toDisposable ds
 
 instance MonadPlus Signal where
-    mzero = mempty
+    mzero = Signal.empty
     a `mplus` b =
         join $ signal $ \sub -> do
             send sub $ NextEvent a

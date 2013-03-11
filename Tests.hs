@@ -31,7 +31,7 @@ testSequencing = do
 
 testAppending = do
     hello
-        `mappend` mempty
+        `mappend` empty
         >>: print
 
     hello
