@@ -11,6 +11,9 @@ module Signal.Operators ( fromFoldable
                         , drop
                         , switch
                         , combine
+                        , never
+                        , Signal.empty
+                        , Signal
                         ) where
 
 import Control.Concurrent.STM
@@ -18,7 +21,6 @@ import Control.Monad
 import Data.Foldable
 import Data.IORef
 import Data.Monoid
-import Event
 import Prelude hiding (filter, take, drop)
 import Disposable
 import Signal

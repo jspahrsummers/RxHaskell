@@ -7,12 +7,8 @@ module Signal.Arrow ( SignalArrow
 import Control.Arrow
 import Control.Category
 import Control.Monad
-import Control.Monad.Fix
-import Event
 import Prelude hiding ((.), id)
-import Signal
 import Signal.Operators
-import Subject
 
 newtype SignalArrow b c = SignalArrow {
     runSignalArrow :: Signal b -> Signal c

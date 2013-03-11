@@ -3,6 +3,7 @@
 module Subscriber ( Subscriber
                   , subscriber
                   , send
+                  , Event(..)
                   ) where
 
 import Control.Applicative

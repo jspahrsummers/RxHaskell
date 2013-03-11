@@ -1,6 +1,7 @@
 {-# LANGUAGE Safe #-}
 
 module Signal ( Signal
+              , Event(..)
               , signal
               , subscribe
               , (>>:)

@@ -5,13 +5,11 @@ import Control.Monad.Zip
 import Data.Monoid
 import Prelude hiding (filter, take, drop)
 import Disposable
-import Event
 import Scheduler
 import Signal
 import Signal.Operators
 import Signal.Scheduled
 import Subject
-import Subscriber
 
 hello = fromFoldable ["hello"]
 world = fromFoldable ["world"]

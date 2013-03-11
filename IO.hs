@@ -4,8 +4,6 @@ module IO ( hLineSignal
           ) where
 
 import Control.Monad
-import Event
-import Scheduler
 import Signal
 import Signal.Scheduled
 import Subscriber

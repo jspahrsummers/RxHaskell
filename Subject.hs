@@ -1,6 +1,8 @@
 {-# LANGUAGE Safe #-}
 
 module Subject ( newSubject
+               , Subscriber
+               , send
                ) where
 
 import Data.Foldable
@@ -9,7 +11,6 @@ import Data.IORef
 import Data.Sequence as Seq
 import Data.Traversable
 import Disposable
-import Event
 import Prelude hiding (mapM_)
 import Signal
 import Subscriber
