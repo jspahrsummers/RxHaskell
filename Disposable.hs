@@ -3,8 +3,11 @@
 
 module Disposable ( Disposable(EmptyDisposable)
                   , newDisposable
+                  , dispose
                   , DisposableSet
                   , newDisposableSet
+                  , addDisposable
+                  , removeDisposable
                   , toDisposable
                   ) where
 
