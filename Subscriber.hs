@@ -3,7 +3,6 @@
 module Subscriber ( Subscriber
                   , subscriber
                   , send
-                  , OnEvent
                   ) where
 
 import Control.Applicative
@@ -14,12 +13,9 @@ import Data.Word
 import Disposable
 import Event
 
--- | A function to run when a signal sends an event.
-type OnEvent a = Event a -> IO ()
-
 -- | Receives events from a signal.
 data Subscriber a = Subscriber {
-    onEvent :: OnEvent a,
+    onEvent :: Event a -> IO (),
     disposable :: Disposable,
     lockedThread :: TVar ThreadId,
     threadLockCounter :: TVar Word32,
@@ -27,7 +23,7 @@ data Subscriber a = Subscriber {
 }
 
 -- | Constructs a subscriber.
-subscriber :: OnEvent a -> IO (Subscriber a)
+subscriber :: (Event a -> IO ()) -> IO (Subscriber a)
 subscriber f = do
     b <- atomically $ newTVar False
     d <- newDisposable $ atomically $ writeTVar b True

@@ -38,7 +38,7 @@ subscribe :: Signal a -> Subscriber a -> IO Disposable
 subscribe (Signal s) = s
 
 -- | Creates a subscriber and subscribes to the signal.
-(>>:) :: Signal a -> OnEvent a -> IO Disposable
+(>>:) :: Signal a -> (Event a -> IO ()) -> IO Disposable
 (>>:) s f = do
     sub <- subscriber f
     subscribe s sub
