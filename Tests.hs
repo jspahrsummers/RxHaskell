@@ -24,8 +24,8 @@ testBinding =
     in join ss >>: print
 
 testSequencing = do
-    (hello >> world) >>: print
-    (world >> hello) >>: print
+    hello >> world >>: print
+    world >> hello >>: print
 
 testAppending = do
     hello
