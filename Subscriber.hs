@@ -41,6 +41,7 @@ subscriber f = do
     }
 
 -- | Acquires a subscriber for the specified thread.
+-- | This is used to ensure that a subscriber never receives multiple events concurrently.
 acquireSubscriber :: Subscriber a -> ThreadId -> STM Bool
 acquireSubscriber sub tid = do
     d <- readTVar (disposed sub)
