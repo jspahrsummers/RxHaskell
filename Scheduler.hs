@@ -34,7 +34,7 @@ newScheduler = do
     }
 
 -- | Schedules @action@ on @s@. Returns a disposable which can be used to cancel it.
-schedule :: Scheduler -> IO () -> IO Disposable
+schedule :: Scheduler -> IO () -> IO (Disposable IO)
 schedule s action = do
     ref <- newIORef False
     atomically $ writeTQueue (queue s) (ref, action)

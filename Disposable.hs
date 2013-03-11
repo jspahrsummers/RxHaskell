@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE Safe #-}
 
 module Disposable ( Disposable(EmptyDisposable)
@@ -12,70 +13,70 @@ module Disposable ( Disposable(EmptyDisposable)
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.IO.Class
 import Data.Foldable as F
+import Data.Functor.Identity
 import Data.Sequence as Seq
 import Data.IORef
 import Data.Unique
 
--- | Represents an operation which can be canceled or a resource which can be freed.
-data Disposable = EmptyDisposable
-                | Disposable Unique (IORef MaybeAction)
+-- | Allows disposal of a resource by running an action in the monad @m@.
+data Disposable m where
+    EmptyDisposable :: Disposable m
+    Disposable :: MonadIO m => Unique -> IORef (Maybe (m ())) -> Disposable m
 
-instance Eq Disposable where
+instance Eq (Disposable m) where
     EmptyDisposable == EmptyDisposable = True
     (Disposable u _) == (Disposable u' _) = u == u'
     _ == _ = False
 
--- | @Just f@ when not yet disposed. @Nothing@ after disposal.
-type MaybeAction = Maybe (IO ())
-
 -- | Disposes a disposable.
-dispose :: Disposable -> IO ()
+dispose :: MonadIO m => Disposable m -> m ()
 dispose EmptyDisposable = return ()
 dispose (Disposable _ mref) = do
-    m <- atomicModifyIORef mref $ \m -> (Nothing, m)
+    m <- liftIO $ atomicModifyIORef mref $ \m -> (Nothing, m)
     maybe (return ()) id m
 
 -- | Creates a disposable which runs the given action upon disposal.
-newDisposable :: IO () -> IO Disposable
-newDisposable action = liftM2 Disposable newUnique $ newIORef $ Just action
+newDisposable :: MonadIO m => m () -> m (Disposable m)
+newDisposable action = do
+    u <- liftIO $ newUnique
+    mref <- liftIO $ newIORef $ Just action
+    return $ Disposable u mref
 
 -- | @Just s@ when not yet disposed. @Nothing@ after disposal.
-type MaybeSet = Maybe (Seq Disposable)
+type MaybeSet m = Maybe (Seq (Disposable m))
 
 -- | A synchronized set of disposables.
-newtype DisposableSet = DisposableSet (IORef MaybeSet)
+newtype DisposableSet m = DisposableSet (IORef (MaybeSet m))
 
 -- | Creates a set of disposables.
-newDisposableSet :: IO DisposableSet
-newDisposableSet = DisposableSet <$> newIORef (Just Seq.empty)
+newDisposableSet :: MonadIO m => m (DisposableSet m)
+newDisposableSet = do
+    mref <- liftIO $ newIORef $ Just Seq.empty
+    return $ DisposableSet mref
 
 -- | Converts a set of disposables into a disposable.
 -- | The constructed disposable will dispose of all disposables in the set.
-toDisposable :: DisposableSet -> IO Disposable
+toDisposable :: MonadIO m => DisposableSet m -> m (Disposable m)
 toDisposable (DisposableSet mref) =
-    let disposeSet :: Seq Disposable -> IO ()
-        disposeSet = F.mapM_ dispose
-
-        action :: IO ()
+    let disposeSet = F.mapM_ dispose
         action = do
-            m <- atomicModifyIORef mref $ \m -> (Nothing, m)
+            m <- liftIO $ atomicModifyIORef mref $ \m -> (Nothing, m)
             maybe (return ()) disposeSet m
     in newDisposable action
 
 -- | Adds a disposable to a set.
-addDisposable :: DisposableSet -> Disposable -> IO ()
+addDisposable :: MonadIO m => DisposableSet m -> Disposable m -> m ()
 addDisposable (DisposableSet mref) d =
-    let addDisposable' :: MaybeSet -> (MaybeSet, Bool)
-        addDisposable' Nothing = (Nothing, True)
+    let addDisposable' Nothing = (Nothing, True)
         addDisposable' (Just s) = (Just $ s |> d, False)
     in do
-        b <- atomicModifyIORef mref addDisposable'
+        b <- liftIO $ atomicModifyIORef mref addDisposable'
         when b $ dispose d
 
 -- | Removes a disposable from a set.
-removeDisposable :: DisposableSet -> Disposable -> IO ()
+removeDisposable :: MonadIO m => DisposableSet m -> Disposable m -> m ()
 removeDisposable (DisposableSet mref) d =
-    let removeDisposable' :: MaybeSet -> MaybeSet
-        removeDisposable' = liftM $ Seq.filter (/= d)
-    in atomicModifyIORef mref $ \m -> (removeDisposable' m, ())
+    let removeDisposable' = liftM $ Seq.filter (/= d)
+    in liftIO $ atomicModifyIORef mref $ \m -> (removeDisposable' m, ())
