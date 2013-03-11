@@ -77,17 +77,6 @@ instance Monad Signal where
             s >>: onOuter >>= addDisposable ds
             toDisposable ds
 
-    a >> b =
-        signal $ \sub -> do
-            ds <- newDisposableSet
-
-            let onEvent CompletedEvent = b `subscribe` sub >>= addDisposable ds
-                onEvent (ErrorEvent e) = send sub $ ErrorEvent e
-                onEvent _ = return ()
-
-            a >>: onEvent >>= addDisposable ds
-            toDisposable ds
-
 instance Functor Signal where
     fmap = liftM
 
