@@ -1,31 +1,33 @@
 {-# LANGUAGE Safe #-}
 
 module Subject ( newSubject
+               , Subscriber
+               , send
                ) where
 
+import Control.Monad.IO.Class
 import Data.Foldable
 import Data.Functor
 import Data.IORef
 import Data.Sequence as Seq
 import Data.Traversable
 import Disposable
-import Event
 import Prelude hiding (mapM_)
 import Signal
 import Subscriber
 
 -- | Creates a controllable signal, represented by a subscriber (a.k.a. sink) and signal pair.
 -- | Sending values on the subscriber will deliver them to all of the signal's subscribers.
-newSubject :: IO (Subscriber a, Signal a)
+newSubject :: MonadIO m => m (Subscriber m v, SignalM m v)
 newSubject = do
-    subj <- newIORef Seq.empty
+    subj <- liftIO $ newIORef Seq.empty
 
     let s =
             signal $ \sub ->
-                atomicModifyIORef subj $ \seq -> (seq |> sub, Disposable.empty)
+                liftIO $ atomicModifyIORef subj $ \seq -> (seq |> sub, EmptyDisposable)
 
         onEvent ev = do
-            subs <- readIORef subj
+            subs <- liftIO $ readIORef subj
             mapM_ (`send` ev) subs
 
     sub <- subscriber onEvent

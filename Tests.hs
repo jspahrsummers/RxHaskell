@@ -5,13 +5,11 @@ import Control.Monad.Zip
 import Data.Monoid
 import Prelude hiding (filter, take, drop)
 import Disposable
-import Event
 import Scheduler
 import Signal
 import Signal.Operators
 import Signal.Scheduled
 import Subject
-import Subscriber
 
 hello = fromFoldable ["hello"]
 world = fromFoldable ["world"]
@@ -22,7 +20,7 @@ testBinding =
                 send sub $ NextEvent hello
                 send sub $ NextEvent world
                 send sub CompletedEvent
-                return Disposable.empty
+                return EmptyDisposable
     in join ss >>: print
 
 testSequencing = do
@@ -31,7 +29,7 @@ testSequencing = do
 
 testAppending = do
     hello
-        `mappend` mempty
+        `mappend` empty
         >>: print
 
     hello
@@ -115,9 +113,9 @@ testMerging = do
     send sub $ NextEvent "foo"
     send sub' $ NextEvent "bar"
     send sub $ NextEvent "fuzz"
-    send sub $ CompletedEvent
+    send sub CompletedEvent
     send sub' $ NextEvent "buzz"
-    send sub' $ CompletedEvent
+    send sub' CompletedEvent
 
 testSwitch = do
     (outerSub, outerSig) <- newSubject
@@ -142,6 +140,6 @@ testCombine = do
     send sub $ NextEvent "foo"
     send sub' $ NextEvent "bar"
     send sub' $ NextEvent "fuzz"
-    send sub' $ CompletedEvent
+    send sub' CompletedEvent
     send sub $ NextEvent "buzz"
-    send sub $ CompletedEvent
+    send sub CompletedEvent

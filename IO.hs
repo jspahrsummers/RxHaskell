@@ -1,12 +1,9 @@
 {-# LANGUAGE Safe #-}
 
-module Signal.IO ( hLineSignal
-                 ) where
+module IO ( hLineSignal
+          ) where
 
-import Control.Applicative
 import Control.Monad
-import Event
-import Scheduler
 import Signal
 import Signal.Scheduled
 import Subscriber

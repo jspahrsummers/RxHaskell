@@ -1,15 +1,20 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE Safe #-}
 
-module Signal ( Signal
+module Signal ( SignalM
+              , Signal
+              , Event(..)
               , signal
               , subscribe
               , (>>:)
               , never
+              , Signal.empty
               ) where
 
 import Control.Applicative
 import Control.Concurrent.STM
 import Control.Monad
+import Control.Monad.IO.Class
 import Control.Monad.Zip
 import Data.IORef
 import Data.Monoid
@@ -20,46 +25,62 @@ import Event
 import Prelude hiding (length, drop, zip)
 import Subscriber
 
--- | A stream of future values.
-data Signal a = Signal (Subscriber a -> IO Disposable)
+-- | A signal which will send values of type @v@ and perform actions in monad @m@.
+newtype SignalM m v = SignalM (Subscriber m v -> m (Disposable m))
+
+-- | A signal which performs actions directly in the IO monad.
+type Signal v = SignalM IO v
 
 -- | Constructs a signal.
 signal
-    :: (Subscriber a -> IO Disposable)  -- ^ A function to run upon each subscription to the signal.
-    -> Signal a                         -- ^ The constructed signal.
+    :: MonadIO m
+    => (Subscriber m v -> m (Disposable m)) -- ^ An action to run upon each subscription.
+    -> SignalM m v                          -- ^ The constructed signal.
 
-signal = Signal
-
--- | Returns a signal which never sends any events.
-never = signal $ const $ return Disposable.empty
+signal = SignalM
 
 -- | Subscribes to a signal.
-subscribe :: Signal a -> Subscriber a -> IO Disposable
-subscribe (Signal s) = s
+subscribe
+    :: MonadIO m
+    => SignalM m v          -- ^ The signal to subscribe to.
+    -> Subscriber m v       -- ^ The subscriber to attach.
+    -> m (Disposable m)     -- ^ A disposable which can be used to cancel the subscription.
+
+subscribe (SignalM f) = f
+
+-- | Returns a signal which never sends any events.
+never :: MonadIO m => SignalM m v
+never = signal $ const $ return EmptyDisposable
+
+-- | Returns a signal which immediately completes.
+empty :: MonadIO m => SignalM m v
+empty = signal $ \sub -> do
+    send sub CompletedEvent
+    return EmptyDisposable
 
 -- | Creates a subscriber and subscribes to the signal.
-(>>:) :: Signal a -> OnEvent a -> IO Disposable
+(>>:) :: MonadIO m => SignalM m v -> (Event v -> m ()) -> m (Disposable m)
 (>>:) s f = do
     sub <- subscriber f
     subscribe s sub
 
 infixl 1 >>:
 
-instance Monad Signal where
+instance MonadIO m => Monad (SignalM m) where
     return v =
         signal $ \sub -> do
             send sub $ NextEvent v
             send sub CompletedEvent
-            return Disposable.empty
+            return EmptyDisposable
 
     s >>= f =
         signal $ \sub -> do
-            sc <- newIORef (1 :: Word32)
-            cd <- newCompositeDisposable
+            sc <- liftIO $ newIORef (1 :: Word32)
+            ds <- newDisposableSet
 
-            let decSubscribers :: IO ()
+            let decSubscribers :: m ()
                 decSubscribers = do
-                    rem <- atomicModifyIORef sc $ \n ->
+                    rem <- liftIO $ atomicModifyIORef sc $ \n ->
                         let n' = n - 1
                         in (n', n')
 
@@ -71,64 +92,51 @@ instance Monad Signal where
                 onOuter CompletedEvent = decSubscribers
                 onOuter (ErrorEvent e) = send sub $ ErrorEvent e
                 onOuter (NextEvent v) = do
-                    atomicModifyIORef sc $ \n -> (n + 1, ())
-                    f v >>: onInner >>= addDisposable cd
+                    liftIO $ atomicModifyIORef sc $ \n -> (n + 1, ())
 
-            s >>: onOuter >>= addDisposable cd
-            return cd
+                    f v >>: onInner >>= addDisposable ds
 
-    a >> b =
-        signal $ \sub -> do
-            cd <- newCompositeDisposable
+            s >>: onOuter >>= addDisposable ds
+            toDisposable ds
 
-            let onEvent CompletedEvent = b `subscribe` sub >>= addDisposable cd
-                onEvent (ErrorEvent e) = send sub $ ErrorEvent e
-                onEvent _ = return ()
-
-            a >>: onEvent >>= addDisposable cd
-            return cd
-
-instance Functor Signal where
+instance MonadIO m => Functor (SignalM m) where
     fmap = liftM
 
-instance Applicative Signal where
+instance MonadIO m => Applicative (SignalM m) where
     pure = return
     (<*>) = ap
 
-instance Monoid (Signal a) where
-    mempty =
-        signal $ \sub ->
-            Disposable.empty <$ send sub CompletedEvent
-
+instance MonadIO m => Monoid (SignalM m v) where
+    mempty = Signal.empty
     a `mappend` b =
         signal $ \sub -> do
-            cd <- newCompositeDisposable
+            ds <- newDisposableSet
 
-            let onEvent CompletedEvent = b `subscribe` sub >>= addDisposable cd
+            let onEvent CompletedEvent = b `subscribe` sub >>= addDisposable ds
                 onEvent e = send sub e
             
-            a >>: onEvent >>= addDisposable cd
-            return cd
+            a >>: onEvent >>= addDisposable ds
+            toDisposable ds
 
-instance MonadPlus Signal where
-    mzero = mempty
+instance MonadIO m => MonadPlus (SignalM m) where
+    mzero = Signal.empty
     a `mplus` b =
         join $ signal $ \sub -> do
             send sub $ NextEvent a
             send sub $ NextEvent b
             send sub CompletedEvent
-            return Disposable.empty
+            return EmptyDisposable
 
-instance MonadZip Signal where
+instance MonadIO m => MonadZip (SignalM m) where
     a `mzip` b =
         signal $ \sub -> do
-            aVals <- atomically $ newTVar Seq.empty
-            aDone <- atomically $ newTVar False
+            aVals <- liftIO $ atomically $ newTVar Seq.empty
+            aDone <- liftIO $ atomically $ newTVar False
 
-            bVals <- atomically $ newTVar Seq.empty
-            bDone <- atomically $ newTVar False
+            bVals <- liftIO $ atomically $ newTVar Seq.empty
+            bDone <- liftIO $ atomically $ newTVar False
 
-            cd <- newCompositeDisposable
+            ds <- newDisposableSet
 
             let completed :: STM [Event (x, y)]
                 completed = do
@@ -160,12 +168,12 @@ instance MonadZip Signal where
                 onEvent' _ _ _ (ErrorEvent e) = return [ErrorEvent e]
 
                 onEvent vt ot f ev = do
-                    evl <- atomically (onEvent' vt ot f ev)
+                    evl <- liftIO $ atomically (onEvent' vt ot f ev)
                     mapM_ (send sub) evl
 
             let at = (aVals, aDone)
                 bt = (bVals, bDone)
 
-            a >>: onEvent at bt zip >>= addDisposable cd
-            b >>: onEvent bt at (flip zip) >>= addDisposable cd
-            return cd
+            a >>: onEvent at bt zip >>= addDisposable ds
+            b >>: onEvent bt at (flip zip) >>= addDisposable ds
+            toDisposable ds
