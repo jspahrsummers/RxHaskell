@@ -1,4 +1,3 @@
-{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE Safe #-}
 
 module Disposable ( Disposable(EmptyDisposable)
