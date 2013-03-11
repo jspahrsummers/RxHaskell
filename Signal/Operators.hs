@@ -56,22 +56,22 @@ filter s f =
     let f' x = if f x then return x else mempty
     in s >>= f'
 
--- | Runs an action whenever the signal sends an event.
-doEvent :: MonadIO m => SignalM m v -> (Event v -> m ()) -> SignalM m v
+-- | Runs a side-effecting action whenever the signal sends an event.
+doEvent :: MonadIO m => SignalM m v -> (Event v -> IO ()) -> SignalM m v
 doEvent s f =
     signal $ \sub ->
-        let onEvent e = f e >> send sub e
+        let onEvent e = liftIO (f e) >> send sub e
         in s >>: onEvent
 
--- | Runs an action whenever the signal sends a value.
-doNext :: MonadIO m => SignalM m v -> (v -> m ()) -> SignalM m v
+-- | Runs a side-effecting action whenever the signal sends a value.
+doNext :: MonadIO m => SignalM m v -> (v -> IO ()) -> SignalM m v
 doNext s f =
     let f' (NextEvent x) = f x
         f' _ = return ()
     in doEvent s f'
 
--- | Runs an action when the signal completes.
-doCompleted :: MonadIO m => SignalM m v -> m () -> SignalM m v
+-- | Runs a side-effecting action when the signal completes.
+doCompleted :: MonadIO m => SignalM m v -> IO () -> SignalM m v
 doCompleted s f =
     let f' CompletedEvent = f
         f' _ = return ()
