@@ -1,5 +1,5 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Signal ( SignalM
               , Signal

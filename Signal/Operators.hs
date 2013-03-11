@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE Safe #-}
 
 module Signal.Operators ( fromFoldable
