@@ -1,19 +1,19 @@
 {-# LANGUAGE Arrows #-}
 
-module TestArrow where
+module TestCircuit where
 
 import Control.Arrow
 import Signal
-import Signal.Arrow
+import Signal.Circuit
 import Signal.Operators
 
 testConcat = do
-    let a :: SignalArrow String String
+    let a :: Circuit String String
         a =
             proc x -> do
                 foo <- arr (++ "foo") -< x
                 bar <- arr (++ "bar") -< x
                 returnA -< (foo ++ ":" ++ bar)
 
-    runSignalArrow a (fromFoldable ["hello", "world"])
+    runCircuit a (fromFoldable ["hello", "world"])
         >>: print
