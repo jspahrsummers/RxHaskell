@@ -30,7 +30,7 @@ subscriber f = do
     b <- liftIO $ atomically $ newTVar False
     d <- newDisposable $ liftIO $ atomically $ writeTVar b True
 
-    tid <- liftIO $ myThreadId
+    tid <- liftIO myThreadId
     lt <- liftIO $ atomically $ newTVar tid
     tlc <- liftIO $ atomically $ newTVar 0
 
@@ -76,7 +76,7 @@ send s ev =
             d <- liftIO $ atomically $ readTVar (disposed s)
             unless d $ onEvent s ev
     in do
-        tid <- liftIO $ myThreadId
+        tid <- liftIO myThreadId
         b <- liftIO $ atomically $ acquireSubscriber s tid
 
         when b $ send' ev >> liftIO (atomically (releaseSubscriber s tid))

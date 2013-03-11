@@ -14,6 +14,7 @@ module Disposable ( Disposable(EmptyDisposable)
 import Control.Applicative
 import Control.Monad
 import Control.Monad.IO.Class
+import Data.Maybe
 import Data.Foldable as F
 import Data.Functor.Identity
 import Data.Sequence as Seq
@@ -35,12 +36,12 @@ dispose :: MonadIO m => Disposable m -> m ()
 dispose EmptyDisposable = return ()
 dispose (Disposable _ mref) = do
     m <- liftIO $ atomicModifyIORef mref $ \m -> (Nothing, m)
-    maybe (return ()) id m
+    fromMaybe (return ()) m
 
 -- | Creates a disposable which runs the given action upon disposal.
 newDisposable :: MonadIO m => m () -> m (Disposable m)
 newDisposable action = do
-    u <- liftIO $ newUnique
+    u <- liftIO newUnique
     mref <- liftIO $ newIORef $ Just action
     return $ Disposable u mref
 

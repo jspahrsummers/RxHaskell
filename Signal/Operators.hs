@@ -167,7 +167,7 @@ combine a b =
         let completed = do
                 ac <- readTVar aDone
                 bc <- readTVar bDone
-                return $ if (ac && bc) then Just CompletedEvent else Nothing
+                return $ if ac && bc then Just CompletedEvent else Nothing
 
             onEvent' _ _ (ErrorEvent e) = return $ Just $ ErrorEvent e
             onEvent' _ done CompletedEvent = writeTVar done True >> completed

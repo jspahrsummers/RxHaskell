@@ -113,9 +113,9 @@ testMerging = do
     send sub $ NextEvent "foo"
     send sub' $ NextEvent "bar"
     send sub $ NextEvent "fuzz"
-    send sub $ CompletedEvent
+    send sub CompletedEvent
     send sub' $ NextEvent "buzz"
-    send sub' $ CompletedEvent
+    send sub' CompletedEvent
 
 testSwitch = do
     (outerSub, outerSig) <- newSubject
@@ -140,6 +140,6 @@ testCombine = do
     send sub $ NextEvent "foo"
     send sub' $ NextEvent "bar"
     send sub' $ NextEvent "fuzz"
-    send sub' $ CompletedEvent
+    send sub' CompletedEvent
     send sub $ NextEvent "buzz"
-    send sub $ CompletedEvent
+    send sub CompletedEvent

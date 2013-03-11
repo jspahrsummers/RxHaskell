@@ -15,5 +15,5 @@ testConcat = do
                 bar <- arr (++ "bar") -< x
                 returnA -< (foo ++ ":" ++ bar)
 
-    (runSignalArrow a) (fromFoldable ["hello", "world"])
+    runSignalArrow a (fromFoldable ["hello", "world"])
         >>: print
