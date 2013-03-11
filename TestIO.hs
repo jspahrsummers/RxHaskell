@@ -2,8 +2,8 @@ module TestIO where
 
 import Control.Concurrent
 import Control.Monad
+import IO
 import Signal
-import Signal.IO
 import System.IO
 
 main = do
