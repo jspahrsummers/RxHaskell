@@ -22,7 +22,7 @@ newSubject = do
 
     let s =
             signal $ \sub ->
-                atomicModifyIORef subj $ \seq -> (seq |> sub, Disposable.empty)
+                atomicModifyIORef subj $ \seq -> (seq |> sub, EmptyDisposable)
 
         onEvent ev = do
             subs <- readIORef subj

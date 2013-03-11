@@ -31,7 +31,7 @@ signal
 signal = Signal
 
 -- | Returns a signal which never sends any events.
-never = signal $ const $ return Disposable.empty
+never = signal $ const $ return EmptyDisposable
 
 -- | Subscribes to a signal.
 subscribe :: Signal a -> Subscriber a -> IO Disposable
@@ -50,12 +50,12 @@ instance Monad Signal where
         signal $ \sub -> do
             send sub $ NextEvent v
             send sub CompletedEvent
-            return Disposable.empty
+            return EmptyDisposable
 
     s >>= f =
         signal $ \sub -> do
             sc <- newIORef (1 :: Word32)
-            cd <- newCompositeDisposable
+            ds <- newDisposableSet
 
             let decSubscribers :: IO ()
                 decSubscribers = do
@@ -72,21 +72,21 @@ instance Monad Signal where
                 onOuter (ErrorEvent e) = send sub $ ErrorEvent e
                 onOuter (NextEvent v) = do
                     atomicModifyIORef sc $ \n -> (n + 1, ())
-                    f v >>: onInner >>= addDisposable cd
+                    f v >>: onInner >>= addDisposable ds
 
-            s >>: onOuter >>= addDisposable cd
-            return cd
+            s >>: onOuter >>= addDisposable ds
+            toDisposable ds
 
     a >> b =
         signal $ \sub -> do
-            cd <- newCompositeDisposable
+            ds <- newDisposableSet
 
-            let onEvent CompletedEvent = b `subscribe` sub >>= addDisposable cd
+            let onEvent CompletedEvent = b `subscribe` sub >>= addDisposable ds
                 onEvent (ErrorEvent e) = send sub $ ErrorEvent e
                 onEvent _ = return ()
 
-            a >>: onEvent >>= addDisposable cd
-            return cd
+            a >>: onEvent >>= addDisposable ds
+            toDisposable ds
 
 instance Functor Signal where
     fmap = liftM
@@ -98,17 +98,17 @@ instance Applicative Signal where
 instance Monoid (Signal a) where
     mempty =
         signal $ \sub ->
-            Disposable.empty <$ send sub CompletedEvent
+            EmptyDisposable <$ send sub CompletedEvent
 
     a `mappend` b =
         signal $ \sub -> do
-            cd <- newCompositeDisposable
+            ds <- newDisposableSet
 
-            let onEvent CompletedEvent = b `subscribe` sub >>= addDisposable cd
+            let onEvent CompletedEvent = b `subscribe` sub >>= addDisposable ds
                 onEvent e = send sub e
             
-            a >>: onEvent >>= addDisposable cd
-            return cd
+            a >>: onEvent >>= addDisposable ds
+            toDisposable ds
 
 instance MonadPlus Signal where
     mzero = mempty
@@ -117,7 +117,7 @@ instance MonadPlus Signal where
             send sub $ NextEvent a
             send sub $ NextEvent b
             send sub CompletedEvent
-            return Disposable.empty
+            return EmptyDisposable
 
 instance MonadZip Signal where
     a `mzip` b =
@@ -128,7 +128,7 @@ instance MonadZip Signal where
             bVals <- atomically $ newTVar Seq.empty
             bDone <- atomically $ newTVar False
 
-            cd <- newCompositeDisposable
+            ds <- newDisposableSet
 
             let completed :: STM [Event (x, y)]
                 completed = do
@@ -166,6 +166,6 @@ instance MonadZip Signal where
             let at = (aVals, aDone)
                 bt = (bVals, bDone)
 
-            a >>: onEvent at bt zip >>= addDisposable cd
-            b >>: onEvent bt at (flip zip) >>= addDisposable cd
-            return cd
+            a >>: onEvent at bt zip >>= addDisposable ds
+            b >>: onEvent bt at (flip zip) >>= addDisposable ds
+            toDisposable ds

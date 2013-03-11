@@ -113,11 +113,11 @@ drop s n =
 switch :: Signal (Signal a) -> Signal a
 switch s =
     signal $ \sub -> do
-        cd <- newCompositeDisposable
+        ds <- newDisposableSet
         actives <- newIORef (True, False) -- Outer, Inner
 
-        currD <- newIORef empty
-        newDisposable (readIORef currD >>= dispose) >>= addDisposable cd
+        currD <- newIORef EmptyDisposable
+        newDisposable (readIORef currD >>= dispose) >>= addDisposable ds
 
         let modifyActives (Nothing, Just ni) = atomicModifyIORef actives $ \(outer, _) -> ((outer, ni), (outer, ni))
             modifyActives (Just no, Nothing) = atomicModifyIORef actives $ \(_, inner) -> ((no, inner), (no, inner))
@@ -137,8 +137,8 @@ switch s =
             onEvent (ErrorEvent e) = send sub $ ErrorEvent e
             onEvent CompletedEvent = modifyActives (Just False, Nothing) >>= completeIfDone
 
-        s >>: onEvent >>= addDisposable cd
-        return cd
+        s >>: onEvent >>= addDisposable ds
+        toDisposable ds
 
 -- | Combines the latest values sent by both signals.
 combine :: Signal a -> Signal b -> Signal (a, b)
@@ -150,7 +150,7 @@ combine a b =
         bVal <- atomically $ newTVar Nothing
         bDone <- atomically $ newTVar False
 
-        cd <- newCompositeDisposable
+        ds <- newDisposableSet
 
         let completed = do
                 ac <- readTVar aDone
@@ -175,7 +175,7 @@ combine a b =
                     (Just ev) -> send sub ev
                     Nothing -> return ()
 
-        a >>: onEvent aVal aDone >>= addDisposable cd
-        b >>: onEvent bVal bDone >>= addDisposable cd
+        a >>: onEvent aVal aDone >>= addDisposable ds
+        b >>: onEvent bVal bDone >>= addDisposable ds
 
-        return cd
+        toDisposable ds

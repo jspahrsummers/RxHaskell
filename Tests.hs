@@ -22,7 +22,7 @@ testBinding =
                 send sub $ NextEvent hello
                 send sub $ NextEvent world
                 send sub CompletedEvent
-                return Disposable.empty
+                return EmptyDisposable
     in join ss >>: print
 
 testSequencing = do
