@@ -6,6 +6,7 @@ import Data.Monoid
 import Prelude hiding (filter, take, drop)
 import Disposable
 import Scheduler
+import Scheduler.Main
 import Signal
 import Signal.Operators
 import Signal.Scheduled
@@ -117,6 +118,12 @@ testWithScheduler =
     withScheduler False $ \mainScheduler -> do
         schedule mainScheduler $ putStrLn "hello"
         schedule mainScheduler $ putStrLn "world"
+
+testMainScheduler = do
+    s <- getMainScheduler
+    schedule s $ putStrLn "hello"
+    schedule s $ putStrLn "world"
+    runMainScheduler
 
 testMerging = do
     (sub, sig) <- newSubject
