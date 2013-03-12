@@ -73,7 +73,7 @@ send :: MonadIO m => Subscriber m v -> Event v -> m ()
 send s ev =
     let send' ev@(NextEvent _) = onEvent s ev
         send' ev = do
-            d <- liftIO $ atomically $ readTVar (disposed s)
+            d <- liftIO $ readTVarIO (disposed s)
             unless d $ onEvent s ev
     in do
         tid <- liftIO myThreadId
