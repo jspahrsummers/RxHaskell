@@ -113,6 +113,11 @@ testScheduledSignal = do
         send sub CompletedEvent
     sig >>: print
 
+testWithScheduler =
+    withScheduler False $ \mainScheduler -> do
+        schedule mainScheduler $ putStrLn "hello"
+        schedule mainScheduler $ putStrLn "world"
+
 testMerging = do
     (sub, sig) <- newSubject
     (sub', sig') <- newSubject
