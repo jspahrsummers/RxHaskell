@@ -40,7 +40,7 @@ newSubject = do
 
 -- | Like 'newSubject', but new subscriptions to the returned signal will receive all values
 -- | which have been sent thus far.
-newReplaySubject :: (MonadIO m, Show v) => m (Subscriber m v, SignalM m v)
+newReplaySubject :: MonadIO m => m (Subscriber m v, SignalM m v)
 newReplaySubject = do
     subsVar <- liftIO $ atomically $ newTVar Seq.empty
     eventsVar <- liftIO $ atomically $ newTVar Seq.empty
