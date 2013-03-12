@@ -1,12 +1,14 @@
 {-# LANGUAGE Safe #-}
 
 module Subject ( newSubject
+               , newReplaySubject
                , Subscriber
                , send
                , runSignal
                , runSignalIO
                ) where
 
+import Control.Concurrent.STM
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 import Data.Foldable
@@ -23,14 +25,42 @@ import Subscriber
 -- | Sending values on the subscriber will deliver them to all of the signal's subscribers.
 newSubject :: MonadIO m => m (Subscriber m v, SignalM m v)
 newSubject = do
-    subj <- liftIO $ newIORef Seq.empty
+    subsRef <- liftIO $ newIORef Seq.empty
 
     let s =
             signal $ \sub ->
-                liftIO $ atomicModifyIORef subj $ \seq -> (seq |> sub, EmptyDisposable)
+                liftIO $ atomicModifyIORef subsRef $ \seq -> (seq |> sub, EmptyDisposable)
 
         onEvent ev = do
-            subs <- liftIO $ readIORef subj
+            subs <- liftIO $ readIORef subsRef
+            mapM_ (`send` ev) subs
+
+    sub <- subscriber onEvent
+    return (sub, s)
+
+-- | Like 'newSubject', but new subscriptions to the returned signal will receive all values
+-- | which have been sent thus far.
+newReplaySubject :: (MonadIO m, Show v) => m (Subscriber m v, SignalM m v)
+newReplaySubject = do
+    subsVar <- liftIO $ atomically $ newTVar Seq.empty
+    eventsVar <- liftIO $ atomically $ newTVar Seq.empty
+
+    let addSubscriber sub = do
+            modifyTVar' subsVar (|> sub)
+            readTVar eventsVar
+        
+        s =
+            signal $ \sub -> do
+                events <- liftIO $ atomically $ addSubscriber sub
+                mapM_ (send sub) events
+                return EmptyDisposable
+
+        addEvent ev = do
+            modifyTVar' eventsVar (|> ev)
+            readTVar subsVar
+
+        onEvent ev = do
+            subs <- liftIO $ atomically $ addEvent ev 
             mapM_ (`send` ev) subs
 
     sub <- subscriber onEvent

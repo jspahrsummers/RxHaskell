@@ -45,6 +45,15 @@ testSubject = do
     sig >>: print
     send sub $ NextEvent "hello world"
 
+testReplaySubject = do
+    (sub, sig) <- newReplaySubject
+
+    send sub $ NextEvent "hello"
+    send sub $ NextEvent "world"
+    send sub CompletedEvent
+
+    sig >>: print
+
 testFilter = do
     hello
         `mappend` world
