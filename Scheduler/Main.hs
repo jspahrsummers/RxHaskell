@@ -6,6 +6,7 @@ module Scheduler.Main ( Scheduler
                       , runMainScheduler
                       ) where
 
+import Control.Concurrent
 import Control.Concurrent.STM
 import Data.IORef
 import Scheduler
@@ -25,6 +26,11 @@ mainSchedulerRef =
 getMainScheduler :: IO Scheduler
 getMainScheduler = readIORef mainSchedulerRef
 
--- | Runs the main scheduler indefinitely.
+-- | Runs the main scheduler indefinitely using the current thread.
+-- | The current thread will be bound if possible.
 runMainScheduler :: IO ()
-runMainScheduler = getMainScheduler >>= schedulerMain
+runMainScheduler =
+    let run = getMainScheduler >>= schedulerMain
+    in if rtsSupportsBoundThreads
+        then runInBoundThread run
+        else run
