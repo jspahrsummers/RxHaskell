@@ -1,6 +1,6 @@
 {-# LANGUAGE Safe #-}
 
-module Scheduler ( Scheduler
+module Scheduler ( Scheduler(ImmediateScheduler)
                  , newScheduler
                  , withScheduler
                  , schedule
@@ -19,7 +19,7 @@ import Scheduler.Internal
 newScheduler :: IO Scheduler
 newScheduler = DynamicScheduler <$> atomically newTQueue
 
--- | Runs an action with a scheduler, then runs all actions enqueued on the scheduler.
+-- | Runs an action with a new scheduler, then runs all actions enqueued on the scheduler.
 withScheduler
     :: Bool                 -- ^ Whether to run the scheduler indefinitely. If 'False', the returned action
                             --   will complete right after all enqueued actions have finished.
@@ -65,3 +65,7 @@ schedule (IndefiniteScheduler q) action = do
     (sa, d) <- newScheduledAction action
     atomically $ writeTQueue q sa
     return d
+
+schedule ImmediateScheduler action = do
+    action
+    return EmptyDisposable

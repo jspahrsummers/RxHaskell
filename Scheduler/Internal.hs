@@ -16,6 +16,7 @@ type ScheduledAction = (IORef Bool, IO ())
 -- | Executes actions serially in FIFO order.
 data Scheduler = DynamicScheduler (TQueue ScheduledAction)
                | IndefiniteScheduler (TQueue ScheduledAction)
+               | ImmediateScheduler
 
 -- | Executes the given action, then re-enters 'schedulerMain'.
 executeScheduledAction :: Scheduler -> ScheduledAction -> IO ()
