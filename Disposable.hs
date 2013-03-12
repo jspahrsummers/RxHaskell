@@ -69,6 +69,7 @@ toDisposable (DisposableSet mref) =
 
 -- | Adds a disposable to a set.
 addDisposable :: MonadIO m => DisposableSet m -> Disposable m -> m ()
+addDisposable _ EmptyDisposable = return ()
 addDisposable (DisposableSet mref) d =
     let addDisposable' Nothing = (Nothing, True)
         addDisposable' (Just s) = (Just $ s |> d, False)
@@ -78,6 +79,7 @@ addDisposable (DisposableSet mref) d =
 
 -- | Removes a disposable from a set.
 removeDisposable :: MonadIO m => DisposableSet m -> Disposable m -> m ()
+removeDisposable _ EmptyDisposable = return ()
 removeDisposable (DisposableSet mref) d =
     let removeDisposable' = liftM $ Seq.filter (/= d)
     in liftIO $ atomicModifyIORef mref $ \m -> (removeDisposable' m, ())
