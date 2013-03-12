@@ -70,7 +70,7 @@ newReplaySubject = do
 -- | and projecting its events one level down.
 runSignal :: (MonadIO m, MonadTrans t, MonadIO (t m)) => SignalM (t m) v -> t m (SignalM m v)
 runSignal smt = do
-    (sub, sm) <- lift newSubject
+    (sub, sm) <- lift newReplaySubject
 
     let onEvent ev = lift $ send sub ev
 
@@ -81,7 +81,7 @@ runSignal smt = do
 -- | and projecting its events out into the IO monad.
 runSignalIO :: MonadIO m => SignalM m v -> m (Signal v)
 runSignalIO sm = do
-    (sub, si) <- liftIO newSubject
+    (sub, si) <- liftIO newReplaySubject
 
     let onEvent ev = liftIO $ send sub ev
 
