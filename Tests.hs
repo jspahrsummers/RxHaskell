@@ -46,8 +46,17 @@ testSubject = do
     sig >>: print
     send sub $ NextEvent "hello world"
 
-testReplaySubject = do
-    (sub, sig) <- newReplaySubject
+testUnlimitedReplaySubject = do
+    (sub, sig) <- newReplaySubject UnlimitedCapacity
+
+    send sub $ NextEvent "hello"
+    send sub $ NextEvent "world"
+    send sub CompletedEvent
+
+    sig >>: print
+
+testLimitedReplaySubject = do
+    (sub, sig) <- newReplaySubject $ LimitedCapacity 2
 
     send sub $ NextEvent "hello"
     send sub $ NextEvent "world"

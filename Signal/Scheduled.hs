@@ -16,7 +16,7 @@ import Subject
 -- | Starts a signal which executes @action@ on @s@.
 start :: Scheduler -> (Subscriber IO v -> IO ()) -> IO (Signal v)
 start s action = do
-    (sub, sig) <- newReplaySubject
+    (sub, sig) <- newReplaySubject UnlimitedCapacity
     schedule s $ action sub
     return sig
 

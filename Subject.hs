@@ -7,6 +7,7 @@ module Subject ( newSubject
                , send
                , runSignal
                , runSignalIO
+               , SubjectCapacity(..)
                ) where
 
 import Control.Concurrent.STM
@@ -18,12 +19,17 @@ import Data.IORef
 import Data.Sequence as Seq
 import Data.Traversable
 import Disposable
-import Prelude hiding (mapM_)
+import Prelude hiding (mapM_, length, drop)
 import Signal
 import Subscriber
 
 -- | A controllable signal, represented by a subscriber (a.k.a. sink) and signal pair.
 type Subject m v = (Subscriber m v, SignalM m v)
+
+-- | Determines how many events a replay subject will save.
+data SubjectCapacity = LimitedCapacity Int  -- ^ The subject will only save the specified number of events.
+                     | UnlimitedCapacity    -- ^ The subject will save an unlimited number of events.
+                     deriving (Eq, Show)
 
 -- | Creates a subject.
 -- | Sending values on the subscriber will deliver them to all of the signal's current subscribers.
@@ -43,9 +49,9 @@ newSubject = do
     return (sub, s)
 
 -- | Like 'newSubject', but new subscriptions to the returned signal will receive all values
--- | which have been sent thus far.
-newReplaySubject :: MonadIO m => m (Subject m v)
-newReplaySubject = do
+-- | (up to the specified capacity) which have been sent thus far.
+newReplaySubject :: MonadIO m => SubjectCapacity -> m (Subject m v)
+newReplaySubject cap = do
     subsVar <- liftIO $ atomically $ newTVar Seq.empty
     eventsVar <- liftIO $ atomically $ newTVar Seq.empty
 
@@ -59,12 +65,20 @@ newReplaySubject = do
                 mapM_ (send sub) events
                 return EmptyDisposable
 
-        addEvent ev = do
-            modifyTVar' eventsVar (|> ev)
-            readTVar subsVar
+        limit n seq =
+            if length seq > n
+            then drop (length seq - n) seq
+            else seq
+
+        addEvent ev =
+            let addEvent' (LimitedCapacity c) seq = limit c $ seq |> ev
+                addEvent' UnlimitedCapacity seq = seq |> ev
+            in do
+                modifyTVar' eventsVar (addEvent' cap)
+                readTVar subsVar
 
         onEvent ev = do
-            subs <- liftIO $ atomically $ addEvent ev 
+            subs <- liftIO $ atomically $ addEvent ev
             mapM_ (`send` ev) subs
 
     sub <- subscriber onEvent
@@ -74,7 +88,7 @@ newReplaySubject = do
 -- | and projecting its events one level down.
 runSignal :: (MonadIO m, MonadTrans t, MonadIO (t m)) => SignalM (t m) v -> t m (SignalM m v)
 runSignal smt = do
-    (sub, sm) <- lift newReplaySubject
+    (sub, sm) <- lift $ newReplaySubject UnlimitedCapacity
 
     let onEvent ev = lift $ send sub ev
 
@@ -85,7 +99,7 @@ runSignal smt = do
 -- | and projecting its events out into the IO monad.
 runSignalIO :: MonadIO m => SignalM m v -> m (Signal v)
 runSignalIO sm = do
-    (sub, si) <- liftIO newReplaySubject
+    (sub, si) <- liftIO $ newReplaySubject UnlimitedCapacity
 
     let onEvent ev = liftIO $ send sub ev
 
