@@ -4,6 +4,7 @@ module Scheduler ( Scheduler(ImmediateScheduler)
                  , newScheduler
                  , withScheduler
                  , schedule
+                 , SchedulerPolicy(..)
                  ) where
 
 import Control.Applicative
@@ -19,21 +20,21 @@ import Scheduler.Internal
 newScheduler :: IO Scheduler
 newScheduler = DynamicScheduler <$> atomically newTQueue
 
--- | Runs an action with a new scheduler, then runs all actions enqueued on the scheduler.
-withScheduler
-    :: Bool                 -- ^ Whether to run the scheduler indefinitely. If 'False', the returned action
-                            --   will complete right after all enqueued actions have finished.
-    -> (Scheduler -> IO a)  -- ^ A function returning the action to run.
-    -> IO a
+-- | Determines how to run a scheduler created with 'withScheduler'.
+data SchedulerPolicy = RunForever       -- ^ Run the scheduler indefinitely.
+                     | RunUntilEmpty    -- ^ Run the scheduler until all enqueued actions have finished.
+                     deriving (Eq, Show)
 
-withScheduler True f = do
+-- | Runs an action with a new scheduler, then runs all actions enqueued on the scheduler.
+withScheduler :: SchedulerPolicy -> (Scheduler -> IO a) -> IO a
+withScheduler RunForever f = do
     s <- IndefiniteScheduler <$> atomically newTQueue
 
     a <- f s
     schedulerMain s
     return a
 
-withScheduler False f = do
+withScheduler RunUntilEmpty f = do
     s <- newScheduler
     f s
 

@@ -124,7 +124,7 @@ testScheduledSignal = do
     sig >>: print
 
 testWithScheduler =
-    withScheduler False $ \mainScheduler -> do
+    withScheduler RunUntilEmpty $ \mainScheduler -> do
         schedule mainScheduler $ putStrLn "hello"
         schedule mainScheduler $ putStrLn "world"
 
