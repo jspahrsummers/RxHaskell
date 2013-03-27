@@ -2,6 +2,7 @@
 
 module Subject ( newSubject
                , newReplaySubject
+               , Subject
                , Subscriber
                , send
                , runSignal
@@ -21,9 +22,12 @@ import Prelude hiding (mapM_)
 import Signal
 import Subscriber
 
--- | Creates a controllable signal, represented by a subscriber (a.k.a. sink) and signal pair.
--- | Sending values on the subscriber will deliver them to all of the signal's subscribers.
-newSubject :: MonadIO m => m (Subscriber m v, SignalM m v)
+-- | A controllable signal, represented by a subscriber (a.k.a. sink) and signal pair.
+type Subject m v = (Subscriber m v, SignalM m v)
+
+-- | Creates a subject.
+-- | Sending values on the subscriber will deliver them to all of the signal's current subscribers.
+newSubject :: MonadIO m => m (Subject m v)
 newSubject = do
     subsRef <- liftIO $ newIORef Seq.empty
 
@@ -40,7 +44,7 @@ newSubject = do
 
 -- | Like 'newSubject', but new subscriptions to the returned signal will receive all values
 -- | which have been sent thus far.
-newReplaySubject :: MonadIO m => m (Subscriber m v, SignalM m v)
+newReplaySubject :: MonadIO m => m (Subject m v)
 newReplaySubject = do
     subsVar <- liftIO $ atomically $ newTVar Seq.empty
     eventsVar <- liftIO $ atomically $ newTVar Seq.empty
