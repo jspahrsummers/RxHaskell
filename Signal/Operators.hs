@@ -11,12 +11,14 @@ module Signal.Operators ( fromFoldable
                         , drop
                         , switch
                         , combine
+                        , first
                         , never
                         , Signal.empty
                         , SignalM
                         , Signal
                         ) where
 
+import Control.Concurrent.MVar
 import Control.Concurrent.STM
 import Control.Monad
 import Control.Monad.IO.Class
@@ -190,3 +192,13 @@ combine a b =
         b >>: onEvent bVal bDone >>= addDisposable ds
 
         toDisposable ds
+
+-- | Synchronously waits for the signal to send an event.
+first :: MonadIO m => SignalM m v -> m (Event v)
+first s = do
+    var <- liftIO newEmptyMVar
+
+    take s 1 >>: liftIO . void . tryPutMVar var
+    ev <- liftIO $ takeMVar var
+
+    return ev

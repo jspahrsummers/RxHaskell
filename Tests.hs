@@ -64,6 +64,13 @@ testLimitedReplaySubject = do
 
     sig >>: print
 
+testFirst = do
+    (sub, sig) <- newReplaySubject $ LimitedCapacity 1
+    send sub $ NextEvent "foobar"
+
+    ev <- first sig
+    print ev
+
 testFilter = do
     hello
         `mappend` world
