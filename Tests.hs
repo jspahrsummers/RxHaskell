@@ -130,11 +130,6 @@ testScheduledSignal = do
         send sub CompletedEvent
     sig >>: print
 
-testWithScheduler =
-    withScheduler RunUntilEmpty $ \mainScheduler -> do
-        schedule mainScheduler $ putStrLn "hello"
-        schedule mainScheduler $ putStrLn "world"
-
 testMainScheduler = do
     s <- getMainScheduler
     schedule s $ putStrLn "hello"

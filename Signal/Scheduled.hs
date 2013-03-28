@@ -14,14 +14,14 @@ import Signal
 import Subject
 
 -- | Starts a signal which executes @action@ on @s@.
-start :: Scheduler -> (Subscriber IO v -> IO ()) -> IO (Signal v)
+start :: Scheduler s => s -> (Subscriber IO v -> IO ()) -> IO (Signal v)
 start s action = do
     (sub, sig) <- newReplaySubject UnlimitedCapacity
     schedule s $ action sub
     return sig
 
 -- | Returns a signal which subscribes to @sig@ on scheduler @sch@.
-subscribeOn :: Signal v -> Scheduler -> Signal v
+subscribeOn :: Scheduler s => Signal v -> s -> Signal v
 subscribeOn sig sch =
     signal $ \sub -> do
         ds <- newDisposableSet
@@ -31,7 +31,7 @@ subscribeOn sig sch =
         toDisposable ds
 
 -- | Returns a signal which delivers the events of @sig@ on scheduler @sch@.
-deliverOn :: Signal v -> Scheduler -> Signal v
+deliverOn :: Scheduler s => Signal v -> s -> Signal v
 deliverOn sig sch =
     signal $ \sub -> do
         -- Although we could hold onto any disposable returned from scheduling,
