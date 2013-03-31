@@ -35,8 +35,8 @@ instance Applicative (ScheduledIO s) where
 -- | Runs a ScheduledIO computation (possibly asynchronously) and discards the result.
 runScheduledIO
     :: Scheduler s
-    => ScheduledIO s a      -- ^ The action to run.
-    -> s                    -- ^ The scheduler to enqueue the action on.
-    -> IO (Disposable IO)   -- ^ A disposable which can be used to cancel the computation before it begins to run.
+    => ScheduledIO s a  -- ^ The action to run.
+    -> s                -- ^ The scheduler to enqueue the action on.
+    -> IO Disposable    -- ^ A disposable which can be used to cancel the computation before it begins to run.
 
 runScheduledIO (ScheduledIO action) s = schedule s $ void action

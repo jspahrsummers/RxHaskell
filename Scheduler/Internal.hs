@@ -18,7 +18,7 @@ import Disposable
 type ScheduledAction = (IORef Bool, IO ())
 
 -- | Creates a new scheduled action, and returns a disposable which can be used to cancel it.
-newScheduledAction :: IO () -> IO (ScheduledAction, Disposable IO)
+newScheduledAction :: IO () -> IO (ScheduledAction, Disposable)
 newScheduledAction action = do
     ref <- newIORef False
     d <- newDisposable $ atomicModifyIORef ref $ const (True, ())
@@ -27,7 +27,7 @@ newScheduledAction action = do
 -- | Represents a queue of IO actions which can be executed in FIFO order.
 class Scheduler s where
     -- | Schedules an action on the scheduler. Returns a disposable which can be used to cancel it.
-    schedule :: s -> IO () -> IO (Disposable IO)
+    schedule :: s -> IO () -> IO Disposable
 
     -- | Executes all current and future actions enqueued on the given scheduler.
     schedulerMain :: s -> IO ()
