@@ -1,5 +1,5 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE Safe #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 module Signal ( SignalM
               , Signal
@@ -23,63 +23,58 @@ import Data.Word
 import Disposable
 import Event
 import Prelude hiding (length, drop, zip)
+import ScheduledIO
 import Scheduler
 import Subscriber
 
--- | A signal which will send values of type @v@ and perform actions in monad @m@,
--- | all on a scheduler of type @s@.
-newtype SignalM m s v = SignalM (Subscriber m s v -> m (Disposable m))
+-- | A signal which will send values of type @v@ on a scheduler of type @s@.
+data Signal s v where
+    Signal :: Scheduler s => (Subscriber s v -> IO Disposable) -> Signal s v
 
--- | A signal which performs actions directly in the IO monad.
-type Signal s v = SignalM IO s v
-
--- | Constructs a signal.
-signal
-    :: (MonadIO m, Scheduler s)
-    => (Subscriber m s v -> m (Disposable m))   -- ^ An action to run upon each subscription.
-    -> SignalM m s v                            -- ^ The constructed signal.
-
-signal = SignalM
+-- | Constructs a signal which sends its values to new subscribers immediately.
+signal :: (Subscriber ImmediateScheduler v -> IO Disposable) -> Signal ImmediateScheduler v
+signal = Signal
 
 -- | Subscribes to a signal.
 subscribe
-    :: (MonadIO m, Scheduler s)
-    => SignalM m s v        -- ^ The signal to subscribe to.
-    -> Subscriber m s v     -- ^ The subscriber to attach.
-    -> m (Disposable m)     -- ^ A disposable which can be used to cancel the subscription.
+    :: Scheduler s
+    => Signal s v       -- ^ The signal to subscribe to.
+    -> Subscriber s v   -- ^ The subscriber to attach.
+    -> IO Disposable    -- ^ A disposable which can be used to terminate the subscription.
 
-subscribe (SignalM f) = f
+subscribe (Signal f) = f
 
 -- | Returns a signal which never sends any events.
-never :: (MonadIO m, Scheduler s) => SignalM m s v
-never = signal $ const $ return EmptyDisposable
+never :: Scheduler s => Signal s v
+never = Signal $ const $ return EmptyDisposable
 
 -- | Returns a signal which immediately completes.
-empty :: MonadIO m => SignalM m ImmediateScheduler v
-empty = mempty
+--empty :: Signal ImmediateScheduler v
+--empty = mempty
+
+-- | Returns a signal which immediately sends a single value, then completes.
+constant :: v -> Signal ImmediateScheduler v
+constant = return
 
 -- | Creates a subscriber and subscribes to the signal.
-(>>:) :: (MonadIO m, Scheduler s) => SignalM m s v -> (Event v -> m ()) -> m (Disposable m)
+(>>:) :: Scheduler s => Signal s v -> (Event v -> ScheduledIO s ()) -> IO Disposable
 (>>:) s f = do
     sub <- subscriber f
     subscribe s sub
 
 infixl 1 >>:
 
-instance (MonadIO m, Scheduler s) => Monad (SignalM m s) where
+instance Scheduler s => Monad (Signal s) where
     return v =
-        signal $ \sub -> do
-            send sub $ NextEvent v
-            send sub CompletedEvent
-            return EmptyDisposable
+        Signal $ \sub ->
+            runScheduledIO $ send sub (NextEvent v) >> send sub CompletedEvent
 
     s >>= f =
         signal $ \sub -> do
-            sc <- liftIO $ newIORef (1 :: Word32)
+            sc <- newIORef (1 :: Word32)
             ds <- newDisposableSet
 
-            let decSubscribers :: m ()
-                decSubscribers = do
+            let decSubscribers = do
                     rem <- liftIO $ atomicModifyIORef sc $ \n ->
                         let n' = n - 1
                         in (n', n')
@@ -91,14 +86,16 @@ instance (MonadIO m, Scheduler s) => Monad (SignalM m s) where
 
                 onOuter CompletedEvent = decSubscribers
                 onOuter (ErrorEvent e) = send sub $ ErrorEvent e
-                onOuter (NextEvent v) = do
-                    liftIO $ atomicModifyIORef sc $ \n -> (n + 1, ())
+                onOuter (NextEvent v) =
+                    liftIO $ do
+                        atomicModifyIORef sc $ \n -> (n + 1, ())
 
-                    f v >>: onInner >>= addDisposable ds
+                        f v >>: onInner >>= addDisposable ds
 
             s >>: onOuter >>= addDisposable ds
             toDisposable ds
 
+{-
 instance (MonadIO m, Scheduler s) => Functor (SignalM m s) where
     fmap = liftM
 
@@ -180,3 +177,4 @@ instance (MonadIO m, Scheduler s) => MonadZip (SignalM m s) where
             a >>: onEvent at bt zip >>= addDisposable ds
             b >>: onEvent bt at (flip zip) >>= addDisposable ds
             toDisposable ds
+-}
