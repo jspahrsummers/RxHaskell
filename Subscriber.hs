@@ -14,27 +14,30 @@ import Control.Monad.IO.Class
 import Data.Word
 import Disposable
 import Event
+import ScheduledIO
 import Scheduler
 
 -- | Receives events from a signal with values of type @v@ and running in a scheduler of type @s@.
--- | The subscriber can then perform actions in monad @m@.
-data Subscriber m s v = Subscriber {
-    onEvent :: Event v -> m (),
-    disposable :: Disposable m,
+-- |
+-- | Note that @s@ refers to the scheduler that events must be sent on. Events are always sent
+-- | synchronously, regardless of @s@.
+data Subscriber s v = Subscriber {
+    onEvent :: Event v -> ScheduledIO s (),
+    disposable :: Disposable,
     lockedThread :: TVar ThreadId,
     threadLockCounter :: TVar Word32,
     disposed :: TVar Bool
 }
 
 -- | Constructs a subscriber.
-subscriber :: (MonadIO m, Scheduler s) => (Event v -> m ()) -> m (Subscriber m s v)
+subscriber :: Scheduler s => (Event v -> ScheduledIO s ()) -> IO (Subscriber s v)
 subscriber f = do
-    b <- liftIO $ atomically $ newTVar False
-    d <- newDisposable $ liftIO $ atomically $ writeTVar b True
+    b <- atomically $ newTVar False
+    d <- newDisposable $ atomically $ writeTVar b True
 
-    tid <- liftIO myThreadId
-    lt <- liftIO $ atomically $ newTVar tid
-    tlc <- liftIO $ atomically $ newTVar 0
+    tid <- myThreadId
+    lt <- atomically $ newTVar tid
+    tlc <- atomically $ newTVar 0
 
     return Subscriber {
         onEvent = f,
@@ -46,7 +49,7 @@ subscriber f = do
 
 -- | Acquires a subscriber for the specified thread.
 -- | This is used to ensure that a subscriber never receives multiple events concurrently.
-acquireSubscriber :: Subscriber m s v -> ThreadId -> STM Bool
+acquireSubscriber :: Subscriber s v -> ThreadId -> STM Bool
 acquireSubscriber sub tid = do
     d <- readTVar (disposed sub)
     if d
@@ -62,7 +65,7 @@ acquireSubscriber sub tid = do
             return True
 
 -- | Releases a subscriber from the specified thread's ownership.
-releaseSubscriber :: Subscriber m s v -> ThreadId -> STM ()
+releaseSubscriber :: Subscriber s v -> ThreadId -> STM ()
 releaseSubscriber sub tid = do
     -- TODO: Skip all this synchronization for singleton scheduler types.
     always $ fmap (== tid) $ readTVar (lockedThread sub)
@@ -73,8 +76,7 @@ releaseSubscriber sub tid = do
     writeTVar (threadLockCounter sub) $ tlc - 1
 
 -- | Synchronously sends an event to a subscriber.
--- | It is the caller's responsibility to ensure the event is sent on the correct scheduler.
-send :: MonadIO m => Subscriber m s v -> Event v -> m ()
+send :: Subscriber s v -> Event v -> ScheduledIO s ()
 send s ev =
     let send' ev@(NextEvent _) = onEvent s ev
         send' ev = do
