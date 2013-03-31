@@ -23,50 +23,50 @@ import Data.Word
 import Disposable
 import Event
 import Prelude hiding (length, drop, zip)
+import Scheduler
 import Subscriber
 
--- | A signal which will send values of type @v@ and perform actions in monad @m@.
-newtype SignalM m v = SignalM (Subscriber m v -> m (Disposable m))
+-- | A signal which will send values of type @v@ and perform actions in monad @m@,
+-- | all on a scheduler of type @s@.
+newtype SignalM m s v = SignalM (Subscriber m s v -> m (Disposable m))
 
 -- | A signal which performs actions directly in the IO monad.
-type Signal v = SignalM IO v
+type Signal s v = SignalM IO s v
 
 -- | Constructs a signal.
 signal
-    :: MonadIO m
-    => (Subscriber m v -> m (Disposable m)) -- ^ An action to run upon each subscription.
-    -> SignalM m v                          -- ^ The constructed signal.
+    :: (MonadIO m, Scheduler s)
+    => (Subscriber m s v -> m (Disposable m))   -- ^ An action to run upon each subscription.
+    -> SignalM m s v                            -- ^ The constructed signal.
 
 signal = SignalM
 
 -- | Subscribes to a signal.
 subscribe
-    :: MonadIO m
-    => SignalM m v          -- ^ The signal to subscribe to.
-    -> Subscriber m v       -- ^ The subscriber to attach.
+    :: (MonadIO m, Scheduler s)
+    => SignalM m s v        -- ^ The signal to subscribe to.
+    -> Subscriber m s v     -- ^ The subscriber to attach.
     -> m (Disposable m)     -- ^ A disposable which can be used to cancel the subscription.
 
 subscribe (SignalM f) = f
 
 -- | Returns a signal which never sends any events.
-never :: MonadIO m => SignalM m v
+never :: (MonadIO m, Scheduler s) => SignalM m s v
 never = signal $ const $ return EmptyDisposable
 
 -- | Returns a signal which immediately completes.
-empty :: MonadIO m => SignalM m v
-empty = signal $ \sub -> do
-    send sub CompletedEvent
-    return EmptyDisposable
+empty :: MonadIO m => SignalM m ImmediateScheduler v
+empty = mempty
 
 -- | Creates a subscriber and subscribes to the signal.
-(>>:) :: MonadIO m => SignalM m v -> (Event v -> m ()) -> m (Disposable m)
+(>>:) :: (MonadIO m, Scheduler s) => SignalM m s v -> (Event v -> m ()) -> m (Disposable m)
 (>>:) s f = do
     sub <- subscriber f
     subscribe s sub
 
 infixl 1 >>:
 
-instance MonadIO m => Monad (SignalM m) where
+instance (MonadIO m, Scheduler s) => Monad (SignalM m s) where
     return v =
         signal $ \sub -> do
             send sub $ NextEvent v
@@ -99,15 +99,18 @@ instance MonadIO m => Monad (SignalM m) where
             s >>: onOuter >>= addDisposable ds
             toDisposable ds
 
-instance MonadIO m => Functor (SignalM m) where
+instance (MonadIO m, Scheduler s) => Functor (SignalM m s) where
     fmap = liftM
 
-instance MonadIO m => Applicative (SignalM m) where
+instance (MonadIO m, Scheduler s) => Applicative (SignalM m s) where
     pure = return
     (<*>) = ap
 
-instance MonadIO m => Monoid (SignalM m v) where
-    mempty = Signal.empty
+instance (MonadIO m, Scheduler s) => Monoid (SignalM m s v) where
+    mempty = signal $ \sub -> do
+        send sub CompletedEvent
+        return EmptyDisposable
+
     a `mappend` b =
         signal $ \sub -> do
             ds <- newDisposableSet
@@ -118,8 +121,8 @@ instance MonadIO m => Monoid (SignalM m v) where
             a >>: onEvent >>= addDisposable ds
             toDisposable ds
 
-instance MonadIO m => MonadPlus (SignalM m) where
-    mzero = Signal.empty
+instance (MonadIO m, Scheduler s) => MonadPlus (SignalM m s) where
+    mzero = mempty
     a `mplus` b =
         join $ signal $ \sub -> do
             send sub $ NextEvent a
@@ -127,7 +130,7 @@ instance MonadIO m => MonadPlus (SignalM m) where
             send sub CompletedEvent
             return EmptyDisposable
 
-instance MonadIO m => MonadZip (SignalM m) where
+instance (MonadIO m, Scheduler s) => MonadZip (SignalM m s) where
     a `mzip` b =
         signal $ \sub -> do
             aVals <- liftIO $ atomically $ newTVar Seq.empty
