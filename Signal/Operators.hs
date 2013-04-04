@@ -14,7 +14,6 @@ module Signal.Operators ( fromFoldable
                         , first
                         , never
                         , Signal.empty
-                        , SignalM
                         , Signal
                         ) where
 
@@ -27,16 +26,17 @@ import Data.IORef
 import Data.Monoid
 import Prelude hiding (filter, take, drop)
 import Disposable
+import Scheduler
 import Signal
 import Subscriber
 
 -- | Turns any Foldable into a signal.
-fromFoldable :: (Foldable t, MonadIO m) => t v -> SignalM m v
+fromFoldable :: Foldable t => t v -> Signal ImmediateScheduler v
 fromFoldable = foldMap return
 
 -- | Treats every signal event as a 'NextEvent' containing the event itself.
 -- | This can be used to make all signal events bindable.
-materialize :: MonadIO m => SignalM m v -> SignalM m (Event v)
+materialize :: Scheduler s => Signal s v -> Signal s (Event v)
 materialize s =
     signal $ \sub ->
         let onEvent CompletedEvent = send sub (NextEvent CompletedEvent) >> send sub CompletedEvent
@@ -44,7 +44,7 @@ materialize s =
         in s >>: onEvent
 
 -- | The inverse of 'materialize'.
-dematerialize :: MonadIO m => SignalM m (Event v) -> SignalM m v
+dematerialize :: Scheduler s => Signal s (Event v) -> Signal s v
 dematerialize s =
     signal $ \sub ->
         let onEvent (NextEvent ev) = send sub ev
@@ -52,40 +52,40 @@ dematerialize s =
         in s >>: onEvent
 
 -- | Filters the values of a signal according to a predicate.
-filter :: MonadIO m => SignalM m v -> (v -> Bool) -> SignalM m v
+filter :: Scheduler s => Signal s v -> (v -> Bool) -> Signal s v
 filter s f =
     let f' x = if f x then return x else mempty
     in s >>= f'
 
 -- | Runs a side-effecting action whenever the signal sends an event.
-doEvent :: MonadIO m => SignalM m v -> (Event v -> IO ()) -> SignalM m v
+doEvent :: Scheduler s => Signal s v -> (Event v -> IO ()) -> Signal s v
 doEvent s f =
     signal $ \sub ->
-        let onEvent e = liftIO (f e) >> send sub e
+        let onEvent e = f e >> send sub e
         in s >>: onEvent
 
 -- | Runs a side-effecting action whenever the signal sends a value.
-doNext :: MonadIO m => SignalM m v -> (v -> IO ()) -> SignalM m v
+doNext :: Scheduler s => Signal s v -> (v -> IO ()) -> Signal s v
 doNext s f =
     let f' (NextEvent x) = f x
         f' _ = return ()
     in doEvent s f'
 
 -- | Runs a side-effecting action when the signal completes.
-doCompleted :: MonadIO m => SignalM m v -> IO () -> SignalM m v
+doCompleted :: Scheduler s => Signal s v -> IO () -> Signal s v
 doCompleted s f =
     let f' CompletedEvent = f
         f' _ = return ()
     in doEvent s f'
 
 -- | Returns a signal of the first @n@ elements.
-take :: (Integral n, MonadIO m) => SignalM m v -> n -> SignalM m v
+take :: (Integral n, Scheduler s) => Signal s v -> n -> Signal s v
 take s n =
     signal $ \sub -> do
-        remRef <- liftIO $ newIORef n
+        remRef <- newIORef n
 
         let onEvent ev@(NextEvent _) = do
-                old <- liftIO $ atomicModifyIORef remRef $ \rem ->
+                old <- atomicModifyIORef remRef $ \rem ->
                     if rem == 0 then (0, 0) else (rem - 1, rem)
 
                 case old of
@@ -94,19 +94,19 @@ take s n =
                     _ -> send sub ev
 
             onEvent ev = do
-                b <- liftIO $ atomicModifyIORef remRef $ \rem -> (0, rem /= 0)
+                b <- atomicModifyIORef remRef $ \rem -> (0, rem /= 0)
                 when b $ send sub ev
 
         s >>: onEvent
 
 -- | Returns a signal without the first @n@ elements.
-drop :: (Integral n, MonadIO m) => SignalM m v -> n -> SignalM m v
+drop :: (Integral n, Scheduler s) => Signal s v -> n -> Signal s v
 drop s n =
     signal $ \sub -> do
-        remRef <- liftIO $ newIORef n
+        remRef <- newIORef n
 
         let onEvent ev@(NextEvent _) = do
-                old <- liftIO $ atomicModifyIORef remRef $ \rem ->
+                old <- atomicModifyIORef remRef $ \rem ->
                     if rem == 0 then (0, 0) else (rem - 1, rem)
 
                 when (old == 0) $ send sub ev
@@ -116,23 +116,23 @@ drop s n =
         s >>: onEvent
 
 -- | Returns a signal that sends the values from the most recently sent signal.
-switch :: MonadIO m => SignalM m (SignalM m v) -> SignalM m v
+switch :: (Scheduler s, Scheduler t) => Signal s (Signal t v) -> Signal t v
 switch s =
     signal $ \sub -> do
         ds <- newDisposableSet
-        actives <- liftIO $ newIORef (True, False) -- Outer, Inner
+        actives <- newIORef (True, False) -- Outer, Inner
 
-        currD <- liftIO $ newIORef EmptyDisposable
+        currD <- newIORef EmptyDisposable
 
         let disposeCurrD = do
-                d <- liftIO $ readIORef currD
+                d <- readIORef currD
                 dispose d
 
         newDisposable disposeCurrD >>= addDisposable ds
 
-        let modifyActives :: MonadIO m => (Maybe Bool, Maybe Bool) -> m (Bool, Bool)
-            modifyActives (Nothing, Just ni) = liftIO $ atomicModifyIORef actives $ \(outer, _) -> ((outer, ni), (outer, ni))
-            modifyActives (Just no, Nothing) = liftIO $ atomicModifyIORef actives $ \(_, inner) -> ((no, inner), (no, inner))
+        let modifyActives :: (Maybe Bool, Maybe Bool) -> IO (Bool, Bool)
+            modifyActives (Nothing, Just ni) = atomicModifyIORef actives $ \(outer, _) -> ((outer, ni), (outer, ni))
+            modifyActives (Just no, Nothing) = atomicModifyIORef actives $ \(_, inner) -> ((no, inner), (no, inner))
 
             completeIfDone (False, False) = send sub CompletedEvent
             completeIfDone _ = return ()
@@ -144,7 +144,7 @@ switch s =
                 modifyActives (Nothing, Just True)
                 nd <- s' >>: onInnerEvent
 
-                oldD <- liftIO $ atomicModifyIORef currD (\oldD -> (nd, oldD))
+                oldD <- atomicModifyIORef currD (\oldD -> (nd, oldD))
                 dispose oldD
 
             onEvent (ErrorEvent e) = send sub $ ErrorEvent e
@@ -154,14 +154,14 @@ switch s =
         toDisposable ds
 
 -- | Combines the latest values sent by both signals.
-combine :: MonadIO m => SignalM m a -> SignalM m b -> SignalM m (a, b)
+combine :: Scheduler s => Signal s a -> Signal s b -> Signal s (a, b)
 combine a b =
     signal $ \sub -> do
-        aVal <- liftIO $ atomically $ newTVar Nothing
-        aDone <- liftIO $ atomically $ newTVar False
+        aVal <- atomically $ newTVar Nothing
+        aDone <- atomically $ newTVar False
 
-        bVal <- liftIO $ atomically $ newTVar Nothing
-        bDone <- liftIO $ atomically $ newTVar False
+        bVal <- atomically $ newTVar Nothing
+        bDone <- atomically $ newTVar False
 
         ds <- newDisposableSet
 
@@ -183,7 +183,7 @@ combine a b =
                     _ -> return Nothing
 
             onEvent val done ev = do
-                m <- liftIO $ atomically $ onEvent' val done ev
+                m <- atomically $ onEvent' val done ev
                 case m of
                     (Just ev) -> send sub ev
                     Nothing -> return ()
@@ -194,11 +194,11 @@ combine a b =
         toDisposable ds
 
 -- | Synchronously waits for the signal to send an event.
-first :: MonadIO m => SignalM m v -> m (Event v)
+first :: Scheduler s => Signal s v -> IO (Event v)
 first s = do
-    var <- liftIO newEmptyMVar
+    var <- newEmptyMVar
 
-    take s 1 >>: liftIO . void . tryPutMVar var
-    ev <- liftIO $ takeMVar var
+    take s 1 >>: void . tryPutMVar var
+    ev <- takeMVar var
 
     return ev
