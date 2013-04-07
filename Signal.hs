@@ -37,13 +37,11 @@ signal = Signal
 -- | Subscribes to a signal.
 subscribe
     :: Scheduler s
-    => Signal s v       -- ^ The signal to subscribe to.
-    -> Subscriber s v   -- ^ The subscriber to attach.
-    -> IO Disposable    -- ^ A disposable which can be used to terminate the subscription.
+    => Signal s v               -- ^ The signal to subscribe to.
+    -> Subscriber s v           -- ^ The subscriber to attach.
+    -> SchedulerIO s Disposable -- ^ A disposable which can be used to terminate the subscription.
 
-subscribe (Signal f) =
-    let unwrap (SchedulerIO action) = action
-    in unwrap . f
+subscribe (Signal f) = f
 
 -- | Returns a signal which never sends any events.
 never :: Scheduler s => Signal s v
@@ -54,9 +52,9 @@ empty :: Scheduler s => Signal s v
 empty = mempty
 
 -- | Creates a subscriber and subscribes to the signal.
-(>>:) :: Scheduler s => Signal s v -> (Event v -> SchedulerIO s ()) -> IO Disposable
+(>>:) :: Scheduler s => Signal s v -> (Event v -> SchedulerIO s ()) -> SchedulerIO s Disposable
 (>>:) s f = do
-    sub <- subscriber f
+    sub <- liftIO $ subscriber f
     subscribe s sub
 
 infixl 1 >>:
@@ -88,10 +86,10 @@ instance Scheduler s => Monad (Signal s) where
                 onOuter (NextEvent v) = do
                     liftIO $ atomicModifyIORef sc $ \n -> (n + 1, ())
 
-                    d <- liftIO $ f v >>: onInner
+                    d <- f v >>: onInner
                     liftIO $ ds `addDisposable` d
 
-            d <- liftIO $ s >>: onOuter
+            d <- s >>: onOuter
             liftIO $ ds `addDisposable` d
             liftIO $ toDisposable ds
 
@@ -112,12 +110,12 @@ instance Scheduler s => Monoid (Signal s v) where
             ds <- liftIO newDisposableSet
 
             let onEvent CompletedEvent = do
-                    d <- liftIO $ b `subscribe` sub
+                    d <- b `subscribe` sub
                     liftIO $ ds `addDisposable` d
 
                 onEvent e = send sub e
             
-            d <- liftIO $ a >>: onEvent
+            d <- a >>: onEvent
             liftIO $ ds `addDisposable` d
             liftIO $ toDisposable ds
 
@@ -180,10 +178,10 @@ szip a b =
         let at = (aVals, aDone)
             bt = (bVals, bDone)
 
-        ad <- liftIO $ a >>: onEvent at bt zip
+        ad <- a >>: onEvent at bt zip
         liftIO $ ds `addDisposable` ad
 
-        bd <- liftIO $ b >>: onEvent bt at (flip zip)
+        bd <- b >>: onEvent bt at (flip zip)
         liftIO $ ds `addDisposable` bd
 
         liftIO $ toDisposable ds

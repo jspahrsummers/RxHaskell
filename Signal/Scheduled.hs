@@ -39,7 +39,7 @@ subscribeOn sig sch =
 
                 subscribe :: SchedulerIO t ()
                 subscribe = do
-                    d <- liftIO $ sig >>: forward
+                    d <- SchedulerIO $ unwrap $ sig >>: forward
                     liftIO $ ds `addDisposable` d
 
             schD <- liftIO $ sch `schedule` subscribe
@@ -64,5 +64,5 @@ deliverOn sig sch =
                 forward :: Event v -> SchedulerIO s ()
                 forward ev = void $ deliver sch ev
 
-            liftIO $ sig >>: forward
+            SchedulerIO $ unwrap $ sig >>: forward
     in signal onSubscribe
