@@ -1,7 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 
-module Scheduler.Main ( Scheduler
-                      , schedule
+module Scheduler.Main ( Scheduler(schedule)
+                      , MainScheduler
                       , getMainScheduler
                       , runMainScheduler
                       ) where
@@ -14,16 +14,16 @@ import Scheduler.Internal
 import System.IO.Unsafe
 
 -- ohai global variable
-mainSchedulerRef :: IORef Scheduler
+mainSchedulerRef :: IORef MainScheduler
 {-# NOINLINE mainSchedulerRef #-}
 mainSchedulerRef =
     unsafePerformIO $ do
         q <- atomically newTQueue
-        newIORef $ IndefiniteScheduler q
+        newIORef $ MainScheduler q
 
 -- | Returns a scheduler representing the main thread.
 -- | Note that 'runMainScheduler' must be called for enqueued actions to actually execute.
-getMainScheduler :: IO Scheduler
+getMainScheduler :: IO MainScheduler
 getMainScheduler = readIORef mainSchedulerRef
 
 -- | Runs the main scheduler indefinitely using the current thread.
