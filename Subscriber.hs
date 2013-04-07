@@ -14,7 +14,6 @@ import Control.Monad.IO.Class
 import Data.Word
 import Disposable
 import Event
-import ScheduledIO
 import Scheduler
 
 -- | Receives events from a signal with values of type @v@ and running in a scheduler of type @s@.
@@ -22,7 +21,7 @@ import Scheduler
 -- | Note that @s@ refers to the scheduler that events must be sent on. Events are always sent
 -- | synchronously, regardless of @s@.
 data Subscriber s v = Subscriber {
-    onEvent :: Event v -> ScheduledIO s (),
+    onEvent :: Event v -> SchedulerIO s (),
     disposable :: Disposable,
     lockedThread :: TVar ThreadId,
     threadLockCounter :: TVar Word32,
@@ -30,7 +29,7 @@ data Subscriber s v = Subscriber {
 }
 
 -- | Constructs a subscriber.
-subscriber :: Scheduler s => (Event v -> ScheduledIO s ()) -> IO (Subscriber s v)
+subscriber :: Scheduler s => (Event v -> SchedulerIO s ()) -> IO (Subscriber s v)
 subscriber f = do
     b <- atomically $ newTVar False
     d <- newDisposable $ atomically $ writeTVar b True
@@ -76,7 +75,7 @@ releaseSubscriber sub tid = do
     writeTVar (threadLockCounter sub) $ tlc - 1
 
 -- | Synchronously sends an event to a subscriber.
-send :: Scheduler s => Subscriber s v -> Event v -> ScheduledIO s ()
+send :: Scheduler s => Subscriber s v -> Event v -> SchedulerIO s ()
 send s ev =
     let send' ev@(NextEvent _) = onEvent s ev
         send' ev = do

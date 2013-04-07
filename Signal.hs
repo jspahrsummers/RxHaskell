@@ -23,16 +23,15 @@ import Data.Word
 import Disposable
 import Event
 import Prelude hiding (length, drop, zip)
-import ScheduledIO
-import Scheduler
+import Scheduler.Internal
 import Subscriber
 
 -- | A signal which will send values of type @v@ on a scheduler of type @s@.
 data Signal s v where
-    Signal :: Scheduler s => (Subscriber s v -> ScheduledIO s Disposable) -> Signal s v
+    Signal :: Scheduler s => (Subscriber s v -> SchedulerIO s Disposable) -> Signal s v
 
 -- | Constructs a signal which sends its values to new subscribers synchronously.
-signal :: Scheduler s => (Subscriber s v -> ScheduledIO s Disposable) -> Signal s v
+signal :: Scheduler s => (Subscriber s v -> SchedulerIO s Disposable) -> Signal s v
 signal = Signal
 
 -- | Subscribes to a signal.
@@ -43,7 +42,7 @@ subscribe
     -> IO Disposable    -- ^ A disposable which can be used to terminate the subscription.
 
 subscribe (Signal f) =
-    let unwrap (ScheduledIO action) = action
+    let unwrap (SchedulerIO action) = action
     in unwrap . f
 
 -- | Returns a signal which never sends any events.
@@ -55,7 +54,7 @@ empty :: Scheduler s => Signal s v
 empty = mempty
 
 -- | Creates a subscriber and subscribes to the signal.
-(>>:) :: Scheduler s => Signal s v -> (Event v -> ScheduledIO s ()) -> IO Disposable
+(>>:) :: Scheduler s => Signal s v -> (Event v -> SchedulerIO s ()) -> IO Disposable
 (>>:) s f = do
     sub <- subscriber f
     subscribe s sub
@@ -173,7 +172,7 @@ szip a b =
             onEvent' (_, done) _ _ CompletedEvent = writeTVar done True >> completed
             onEvent' _ _ _ (ErrorEvent e) = return [ErrorEvent e]
 
-            onEvent :: (TVar (Seq x), TVar Bool) -> (TVar (Seq y), TVar Bool) -> (Seq x -> Seq y -> Seq (a, b)) -> Event x -> ScheduledIO s ()
+            onEvent :: (TVar (Seq x), TVar Bool) -> (TVar (Seq y), TVar Bool) -> (Seq x -> Seq y -> Seq (a, b)) -> Event x -> SchedulerIO s ()
             onEvent vt ot f ev = do
                 evl <- liftIO $ atomically $ onEvent' vt ot f ev
                 mapM_ (send sub) evl
