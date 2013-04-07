@@ -1,23 +1,23 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE Safe #-}
 
-module ScheduledIO ( ScheduledIO
-                   , runScheduledIO
+module ScheduledIO ( ScheduledIO(..)
                    ) where
 
 import Control.Applicative
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Functor
-import Disposable
 import Scheduler
 
 -- | An IO computation that must be performed in a scheduler of type @s@.
-newtype ScheduledIO s a = ScheduledIO (IO a)
+data ScheduledIO s a where
+    ScheduledIO :: Scheduler s => IO a -> ScheduledIO s a
 
 instance Functor (ScheduledIO s) where
     fmap f (ScheduledIO action) = ScheduledIO $ fmap f action
 
-instance Monad (ScheduledIO s) where
+instance Scheduler s => Monad (ScheduledIO s) where
     return = ScheduledIO . return
     (ScheduledIO action) >>= f =
         let unwrap (ScheduledIO action) = action
@@ -25,18 +25,9 @@ instance Monad (ScheduledIO s) where
             v <- action
             unwrap $ f v
 
-instance MonadIO (ScheduledIO s) where
+instance Scheduler s => MonadIO (ScheduledIO s) where
     liftIO = ScheduledIO
 
-instance Applicative (ScheduledIO s) where
+instance Scheduler s => Applicative (ScheduledIO s) where
     pure = return
     (<*>) = ap
-
--- | Runs a ScheduledIO computation (possibly asynchronously) and discards the result.
-runScheduledIO
-    :: Scheduler s
-    => s                -- ^ The scheduler to enqueue the action on.
-    -> ScheduledIO s a  -- ^ The action to run.
-    -> IO Disposable    -- ^ A disposable which can be used to cancel the computation before it begins to run.
-
-runScheduledIO s (ScheduledIO action) = schedule s $ void action
