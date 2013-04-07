@@ -47,7 +47,7 @@ testAppending = do
 
 testSubject :: SchedulerIO MainScheduler ()
 testSubject = do
-    (sub, sig) <- liftIO $ newSubject
+    (sub, sig) <- liftIO newSubject
     sig >>: liftIO . print
     send sub $ NextEvent "hello world"
 

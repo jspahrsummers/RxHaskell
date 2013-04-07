@@ -79,6 +79,4 @@ first s = do
         subscribe = take s 1 >>: onEvent
 
     unsafeRunSchedulerIO subscribe
-    ev <- takeMVar var
-
-    return ev
+    takeMVar var

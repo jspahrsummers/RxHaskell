@@ -139,7 +139,7 @@ szip a b =
         bVals <- liftIO $ atomically $ newTVar (Seq.empty :: Seq b)
         bDone <- liftIO $ atomically $ newTVar False
 
-        ds <- liftIO $ newDisposableSet
+        ds <- liftIO newDisposableSet
 
         let completed :: STM [Event (a, b)]
             completed = do
