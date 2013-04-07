@@ -11,7 +11,7 @@ import Scheduler.Main
 import Signal
 import Signal.Operators
 import Signal.Scheduled
-import Subject
+import Channel
 
 hello = fromFoldable ["hello"]
 world = fromFoldable ["world"]
@@ -45,15 +45,15 @@ testAppending = do
         `mappend` hello
         >>: liftIO . print
 
-testSubject :: SchedulerIO MainScheduler ()
-testSubject = do
-    (sub, sig) <- liftIO newSubject
+testChannel :: SchedulerIO MainScheduler ()
+testChannel = do
+    (sub, sig) <- liftIO newChannel
     sig >>: liftIO . print
     send sub $ NextEvent "hello world"
 
-testUnlimitedReplaySubject :: SchedulerIO MainScheduler Disposable
-testUnlimitedReplaySubject = do
-    (sub, sig) <- liftIO $ newReplaySubject UnlimitedCapacity
+testUnlimitedReplayChannel :: SchedulerIO MainScheduler Disposable
+testUnlimitedReplayChannel = do
+    (sub, sig) <- liftIO $ newReplayChannel UnlimitedCapacity
 
     send sub $ NextEvent "hello"
     send sub $ NextEvent "world"
@@ -61,9 +61,9 @@ testUnlimitedReplaySubject = do
 
     sig >>: liftIO . print
 
-testLimitedReplaySubject :: SchedulerIO MainScheduler Disposable
-testLimitedReplaySubject = do
-    (sub, sig) <- liftIO $ newReplaySubject $ LimitedCapacity 2
+testLimitedReplayChannel :: SchedulerIO MainScheduler Disposable
+testLimitedReplayChannel = do
+    (sub, sig) <- liftIO $ newReplayChannel $ LimitedCapacity 2
 
     send sub $ NextEvent "hello"
     send sub $ NextEvent "world"
@@ -73,7 +73,7 @@ testLimitedReplaySubject = do
 
 testFirst :: SchedulerIO MainScheduler ()
 testFirst = do
-    (sub, sig) <- liftIO $ newReplaySubject $ LimitedCapacity 1
+    (sub, sig) <- liftIO $ newReplayChannel $ LimitedCapacity 1
     send sub $ NextEvent "foobar"
 
     ev <- liftIO $ first sig
@@ -158,8 +158,8 @@ testMainScheduler = do
 
 testMerging :: SchedulerIO MainScheduler ()
 testMerging = do
-    (sub, sig) <- liftIO newSubject
-    (sub', sig') <- liftIO newSubject
+    (sub, sig) <- liftIO newChannel
+    (sub', sig') <- liftIO newChannel
 
     sig `mplus` sig' >>: liftIO . print
 
@@ -172,8 +172,8 @@ testMerging = do
 
 testSwitch :: SchedulerIO MainScheduler ()
 testSwitch = do
-    (outerSub, outerSig) <- liftIO newSubject
-    (innerSub, innerSig) <- liftIO newSubject
+    (outerSub, outerSig) <- liftIO newChannel
+    (innerSub, innerSig) <- liftIO newChannel
     switch outerSig >>: liftIO . print
 
     send outerSub $ NextEvent $ fromFoldable ["1", "2"]
@@ -187,8 +187,8 @@ testSwitch = do
 
 testCombine :: SchedulerIO MainScheduler ()
 testCombine = do
-    (sub, sig) <- liftIO newSubject
-    (sub', sig') <- liftIO newSubject
+    (sub, sig) <- liftIO newChannel
+    (sub', sig') <- liftIO newChannel
 
     sig `combine` sig' >>: liftIO . print
 

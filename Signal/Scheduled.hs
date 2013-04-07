@@ -18,12 +18,12 @@ import Scheduler
 import Scheduler.Internal
 import Signal
 import Signal.Operators
-import Subject
+import Channel
 
 -- | Starts a signal which executes @action@ on @s@.
 start :: Scheduler s => s -> (Subscriber s v -> SchedulerIO s ()) -> IO (Signal s v)
 start s action = do
-    (sub, sig) <- newReplaySubject UnlimitedCapacity
+    (sub, sig) <- newReplayChannel UnlimitedCapacity
     schedule s $ action sub
     return sig
 

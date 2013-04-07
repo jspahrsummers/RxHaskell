@@ -1,11 +1,11 @@
 {-# LANGUAGE Safe #-}
 
-module Subject ( newSubject
-               , newReplaySubject
-               , Subject
+module Channel ( newChannel
+               , newReplayChannel
+               , Channel
                , Subscriber
                , send
-               , SubjectCapacity(..)
+               , ChannelCapacity(..)
                ) where
 
 import Control.Concurrent.STM
@@ -22,18 +22,20 @@ import Scheduler
 import Signal
 import Subscriber
 
--- | A controllable signal, represented by a subscriber (a.k.a. sink) and signal pair.
-type Subject s v = (Subscriber s v, Signal s v)
+-- | A controllable signal, represented by a subscriber and signal pair.
+-- |
+-- | Values sent to the subscriber will automatically be broadcast to all of the signal's subscribers.
+-- | In effect, the subscriber is the "write" end, while the signal is the "read" end.
+type Channel s v = (Subscriber s v, Signal s v)
 
--- | Determines how many events a replay subject will save.
-data SubjectCapacity = LimitedCapacity Int  -- ^ The subject will only save the specified number of events.
-                     | UnlimitedCapacity    -- ^ The subject will save an unlimited number of events.
+-- | Determines how many events a replay channel will save.
+data ChannelCapacity = LimitedCapacity Int  -- ^ The channel will only save the specified number of events.
+                     | UnlimitedCapacity    -- ^ The channel will save an unlimited number of events.
                      deriving (Eq, Show)
 
--- | Creates a subject.
--- | Sending values on the subscriber will deliver them to all of the signal's current subscribers.
-newSubject :: Scheduler s => IO (Subject s v)
-newSubject = do
+-- | Creates a simple channel which broadcasts all values sent to it.
+newChannel :: Scheduler s => IO (Channel s v)
+newChannel = do
     subsRef <- newIORef Seq.empty
 
     let s =
@@ -47,10 +49,10 @@ newSubject = do
     sub <- subscriber onEvent
     return (sub, s)
 
--- | Like 'newSubject', but new subscriptions to the returned signal will receive all values
+-- | Like 'newChannel', but new subscriptions to the returned signal will receive all values
 -- | (up to the specified capacity) which have been sent thus far.
-newReplaySubject :: Scheduler s => SubjectCapacity -> IO (Subject s v)
-newReplaySubject cap = do
+newReplayChannel :: Scheduler s => ChannelCapacity -> IO (Channel s v)
+newReplayChannel cap = do
     subsVar <- atomically $ newTVar Seq.empty
     eventsVar <- atomically $ newTVar Seq.empty
 
