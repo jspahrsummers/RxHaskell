@@ -2,7 +2,6 @@
 
 module Scheduler.Internal ( ScheduledAction
                           , Scheduler(..)
-                          , ImmediateScheduler(..)
                           , BackgroundScheduler(..)
                           , MainScheduler(..)
                           , executeScheduledAction
@@ -31,16 +30,6 @@ class Scheduler s where
 
     -- | Executes all current and future actions enqueued on the given scheduler.
     schedulerMain :: s -> IO ()
-
--- | A scheduler which runs actions immediately, blocking the caller.
-data ImmediateScheduler = ImmediateScheduler
-
-instance Scheduler ImmediateScheduler where
-    schedule _ action = do
-        action
-        return EmptyDisposable
-
-    schedulerMain _ = return ()
 
 -- | A scheduler which runs enqueued actions in a dedicated background thread.
 newtype BackgroundScheduler = BackgroundScheduler (TQueue ScheduledAction)

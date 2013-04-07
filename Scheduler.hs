@@ -1,7 +1,6 @@
 {-# LANGUAGE Safe #-}
 
 module Scheduler ( Scheduler(schedule)
-                 , ImmediateScheduler(ImmediateScheduler)
                  , BackgroundScheduler
                  , MainScheduler
                  , newScheduler
