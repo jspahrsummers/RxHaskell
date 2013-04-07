@@ -38,10 +38,10 @@ newSubject = do
 
     let s =
             signal $ \sub ->
-                atomicModifyIORef subsRef $ \seq -> (seq |> sub, EmptyDisposable)
+                liftIO $ atomicModifyIORef subsRef $ \seq -> (seq |> sub, EmptyDisposable)
 
         onEvent ev = do
-            subs <- readIORef subsRef
+            subs <- liftIO $ readIORef subsRef
             mapM_ (`send` ev) subs
 
     sub <- subscriber onEvent
@@ -60,7 +60,7 @@ newReplaySubject cap = do
         
         s =
             signal $ \sub -> do
-                events <- atomically $ addSubscriber sub
+                events <- liftIO $ atomically $ addSubscriber sub
                 mapM_ (send sub) events
                 return EmptyDisposable
 
@@ -77,7 +77,7 @@ newReplaySubject cap = do
                 readTVar subsVar
 
         onEvent ev = do
-            subs <- atomically $ addEvent ev
+            subs <- liftIO $ atomically $ addEvent ev
             mapM_ (`send` ev) subs
 
     sub <- subscriber onEvent
