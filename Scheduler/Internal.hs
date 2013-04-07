@@ -2,6 +2,7 @@
 {-# LANGUAGE Safe #-}
 
 module Scheduler.Internal ( SchedulerIO(..)
+                          , unsafeRunSchedulerIO
                           , ScheduledAction
                           , Scheduler(..)
                           , BackgroundScheduler(..)
@@ -22,16 +23,22 @@ import Disposable
 data SchedulerIO s a where
     SchedulerIO :: Scheduler s => IO a -> SchedulerIO s a
 
+-- | Extracts the underlying IO action from a 'SchedulerIO' action.
+-- |
+-- | This can be unsafe because the type system does not have enough information to determine
+-- | whether the calling code is running on an appropriate scheduler.
+unsafeRunSchedulerIO :: Scheduler s => SchedulerIO s a -> IO a
+unsafeRunSchedulerIO (SchedulerIO action) = action
+
 instance Functor (SchedulerIO s) where
     fmap f (SchedulerIO action) = SchedulerIO $ fmap f action
 
 instance Scheduler s => Monad (SchedulerIO s) where
     return = SchedulerIO . return
     (SchedulerIO action) >>= f =
-        let unwrap (SchedulerIO action) = action
-        in SchedulerIO $ do
+        SchedulerIO $ do
             v <- action
-            unwrap $ f v
+            unsafeRunSchedulerIO $ f v
 
 instance Scheduler s => MonadIO (SchedulerIO s) where
     liftIO = SchedulerIO

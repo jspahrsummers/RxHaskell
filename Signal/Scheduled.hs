@@ -20,10 +20,6 @@ import Signal
 import Signal.Operators
 import Subject
 
--- | Retrieves the underlying 'IO' action from a 'SchedulerIO' action.
-unwrap :: Scheduler s => SchedulerIO s a -> IO a
-unwrap (SchedulerIO action) = action
-
 -- | Starts a signal which executes @action@ on @s@.
 start :: Scheduler s => s -> (Subscriber s v -> SchedulerIO s ()) -> IO (Signal s v)
 start s action = do
@@ -39,11 +35,11 @@ subscribeOn sig sch =
             ds <- liftIO newDisposableSet
 
             let forward :: Event v -> SchedulerIO s ()
-                forward ev = SchedulerIO $ unwrap $ sub `send` ev
+                forward ev = SchedulerIO $ unsafeRunSchedulerIO $ sub `send` ev
 
                 subscribe :: SchedulerIO t ()
                 subscribe = do
-                    d <- SchedulerIO $ unwrap $ sig >>: forward
+                    d <- SchedulerIO $ unsafeRunSchedulerIO $ sig >>: forward
                     liftIO $ ds `addDisposable` d
 
             schD <- liftIO $ sch `schedule` subscribe
@@ -62,13 +58,13 @@ deliverOn sig sch =
             -- slightly faster cancellation.
             let deliver :: t -> Event v -> SchedulerIO s Disposable
                 deliver sch ev =
-                    let sio = SchedulerIO $ unwrap $ sub `send` ev
+                    let sio = SchedulerIO $ unsafeRunSchedulerIO $ sub `send` ev
                     in liftIO $ sch `schedule` sio
 
                 forward :: Event v -> SchedulerIO s ()
                 forward ev = void $ deliver sch ev
 
-            SchedulerIO $ unwrap $ sig >>: forward
+            SchedulerIO $ unsafeRunSchedulerIO $ sig >>: forward
     in signal onSubscribe
 
 -- | Synchronously waits for the signal to send an event.
@@ -82,7 +78,7 @@ first s = do
         subscribe :: SchedulerIO s Disposable
         subscribe = take s 1 >>: onEvent
 
-    unwrap subscribe
+    unsafeRunSchedulerIO subscribe
     ev <- takeMVar var
 
     return ev
