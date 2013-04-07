@@ -14,6 +14,7 @@ import Control.Monad.IO.Class
 import Data.Word
 import Disposable
 import Event
+import ScheduledIO
 import Scheduler
 
 -- | Receives events from a signal with values of type @v@ and running in a scheduler of type @s@.
@@ -21,7 +22,7 @@ import Scheduler
 -- | Note that @s@ refers to the scheduler that events must be sent on. Events are always sent
 -- | synchronously, regardless of @s@.
 data Subscriber s v = Subscriber {
-    onEvent :: Event v -> IO (),
+    onEvent :: Event v -> ScheduledIO s (),
     disposable :: Disposable,
     lockedThread :: TVar ThreadId,
     threadLockCounter :: TVar Word32,
@@ -29,7 +30,7 @@ data Subscriber s v = Subscriber {
 }
 
 -- | Constructs a subscriber.
-subscriber :: Scheduler s => (Event v -> IO ()) -> IO (Subscriber s v)
+subscriber :: Scheduler s => (Event v -> ScheduledIO s ()) -> IO (Subscriber s v)
 subscriber f = do
     b <- atomically $ newTVar False
     d <- newDisposable $ atomically $ writeTVar b True
@@ -75,14 +76,14 @@ releaseSubscriber sub tid = do
     writeTVar (threadLockCounter sub) $ tlc - 1
 
 -- | Synchronously sends an event to a subscriber.
-send :: Subscriber s v -> Event v -> IO ()
+send :: Scheduler s => Subscriber s v -> Event v -> ScheduledIO s ()
 send s ev =
     let send' ev@(NextEvent _) = onEvent s ev
         send' ev = do
-            d <- readTVarIO (disposed s)
+            d <- liftIO $ readTVarIO $ disposed s
             unless d $ onEvent s ev
     in do
-        tid <- myThreadId
-        b <- atomically $ acquireSubscriber s tid
+        tid <- liftIO myThreadId
+        b <- liftIO $ atomically $ acquireSubscriber s tid
 
-        when b $ send' ev >> atomically (releaseSubscriber s tid)
+        when b $ send' ev >> liftIO (atomically (releaseSubscriber s tid))
