@@ -23,15 +23,16 @@ import Data.Word
 import Disposable
 import Event
 import Prelude hiding (length, drop, zip)
+import ScheduledIO
 import Scheduler
 import Subscriber
 
 -- | A signal which will send values of type @v@ on a scheduler of type @s@.
 data Signal s v where
-    Signal :: Scheduler s => (Subscriber s v -> IO Disposable) -> Signal s v
+    Signal :: Scheduler s => (Subscriber s v -> ScheduledIO s Disposable) -> Signal s v
 
 -- | Constructs a signal which sends its values to new subscribers synchronously.
-signal :: Scheduler s => (Subscriber s v -> IO Disposable) -> Signal s v
+signal :: Scheduler s => (Subscriber s v -> ScheduledIO s Disposable) -> Signal s v
 signal = Signal
 
 -- | Subscribes to a signal.
@@ -41,7 +42,9 @@ subscribe
     -> Subscriber s v   -- ^ The subscriber to attach.
     -> IO Disposable    -- ^ A disposable which can be used to terminate the subscription.
 
-subscribe (Signal f) = f
+subscribe (Signal f) =
+    let unwrap (ScheduledIO action) = action
+    in unwrap . f
 
 -- | Returns a signal which never sends any events.
 never :: Scheduler s => Signal s v
@@ -52,7 +55,7 @@ empty :: Scheduler s => Signal s v
 empty = mempty
 
 -- | Creates a subscriber and subscribes to the signal.
-(>>:) :: Scheduler s => Signal s v -> (Event v -> IO ()) -> IO Disposable
+(>>:) :: Scheduler s => Signal s v -> (Event v -> ScheduledIO s ()) -> IO Disposable
 (>>:) s f = do
     sub <- subscriber f
     subscribe s sub
@@ -68,11 +71,11 @@ instance Scheduler s => Monad (Signal s) where
 
     s >>= f =
         Signal $ \sub -> do
-            sc <- newIORef (1 :: Word32)
-            ds <- newDisposableSet
+            sc <- liftIO $ newIORef (1 :: Word32)
+            ds <- liftIO newDisposableSet
 
             let decSubscribers = do
-                    rem <- atomicModifyIORef sc $ \n ->
+                    rem <- liftIO $ atomicModifyIORef sc $ \n ->
                         let n' = n - 1
                         in (n', n')
 
@@ -84,12 +87,14 @@ instance Scheduler s => Monad (Signal s) where
                 onOuter CompletedEvent = decSubscribers
                 onOuter (ErrorEvent e) = send sub $ ErrorEvent e
                 onOuter (NextEvent v) = do
-                    atomicModifyIORef sc $ \n -> (n + 1, ())
+                    liftIO $ atomicModifyIORef sc $ \n -> (n + 1, ())
 
-                    f v >>: onInner >>= addDisposable ds
+                    d <- liftIO $ f v >>: onInner
+                    liftIO $ ds `addDisposable` d
 
-            s >>: onOuter >>= addDisposable ds
-            toDisposable ds
+            d <- liftIO $ s >>: onOuter
+            liftIO $ ds `addDisposable` d
+            liftIO $ toDisposable ds
 
 instance Scheduler s => Functor (Signal s) where
     fmap = liftM
@@ -105,13 +110,17 @@ instance Scheduler s => Monoid (Signal s v) where
 
     a `mappend` b =
         Signal $ \sub -> do
-            ds <- newDisposableSet
+            ds <- liftIO newDisposableSet
 
-            let onEvent CompletedEvent = b `subscribe` sub >>= addDisposable ds
+            let onEvent CompletedEvent = do
+                    d <- liftIO $ b `subscribe` sub
+                    liftIO $ ds `addDisposable` d
+
                 onEvent e = send sub e
             
-            a >>: onEvent >>= addDisposable ds
-            toDisposable ds
+            d <- liftIO $ a >>: onEvent
+            liftIO $ ds `addDisposable` d
+            liftIO $ toDisposable ds
 
 instance Scheduler s => MonadPlus (Signal s) where
     mzero = mempty
@@ -127,13 +136,13 @@ instance Scheduler s => MonadPlus (Signal s) where
 szip :: forall a b s. Scheduler s => Signal s a -> Signal s b -> Signal s (a, b)
 szip a b =
     Signal $ \sub -> do
-        aVals <- atomically $ newTVar (Seq.empty :: Seq a)
-        aDone <- atomically $ newTVar False
+        aVals <- liftIO $ atomically $ newTVar (Seq.empty :: Seq a)
+        aDone <- liftIO $ atomically $ newTVar False
 
-        bVals <- atomically $ newTVar (Seq.empty :: Seq b)
-        bDone <- atomically $ newTVar False
+        bVals <- liftIO $ atomically $ newTVar (Seq.empty :: Seq b)
+        bDone <- liftIO $ atomically $ newTVar False
 
-        ds <- newDisposableSet
+        ds <- liftIO $ newDisposableSet
 
         let completed :: STM [Event (a, b)]
             completed = do
@@ -164,17 +173,21 @@ szip a b =
             onEvent' (_, done) _ _ CompletedEvent = writeTVar done True >> completed
             onEvent' _ _ _ (ErrorEvent e) = return [ErrorEvent e]
 
-            onEvent :: (TVar (Seq x), TVar Bool) -> (TVar (Seq y), TVar Bool) -> (Seq x -> Seq y -> Seq (a, b)) -> Event x -> IO ()
+            onEvent :: (TVar (Seq x), TVar Bool) -> (TVar (Seq y), TVar Bool) -> (Seq x -> Seq y -> Seq (a, b)) -> Event x -> ScheduledIO s ()
             onEvent vt ot f ev = do
-                evl <- atomically $ onEvent' vt ot f ev
+                evl <- liftIO $ atomically $ onEvent' vt ot f ev
                 mapM_ (send sub) evl
 
         let at = (aVals, aDone)
             bt = (bVals, bDone)
 
-        a >>: onEvent at bt zip >>= addDisposable ds
-        b >>: onEvent bt at (flip zip) >>= addDisposable ds
-        toDisposable ds
+        ad <- liftIO $ a >>: onEvent at bt zip
+        liftIO $ ds `addDisposable` ad
+
+        bd <- liftIO $ b >>: onEvent bt at (flip zip)
+        liftIO $ ds `addDisposable` bd
+
+        liftIO $ toDisposable ds
 
 instance Scheduler s => MonadZip (Signal s) where
     mzip = szip
