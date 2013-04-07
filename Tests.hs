@@ -1,6 +1,7 @@
 module Tests where
 
 import Control.Monad
+import Control.Monad.IO.Class
 import Control.Monad.Zip
 import Data.Monoid
 import Prelude hiding (filter, take, drop)
@@ -15,6 +16,7 @@ import Subject
 hello = fromFoldable ["hello"]
 world = fromFoldable ["world"]
 
+testBinding :: SchedulerIO MainScheduler Disposable
 testBinding =
     let ss =
             signal $ \sub -> do
@@ -22,125 +24,144 @@ testBinding =
                 send sub $ NextEvent world
                 send sub CompletedEvent
                 return EmptyDisposable
-    in join ss >>: print
+    in join ss >>: liftIO . print
 
+testSequencing :: SchedulerIO MainScheduler Disposable
 testSequencing = do
-    hello >> world >>: print
-    world >> hello >>: print
+    hello >> world >>: liftIO . print
+    world >> hello >>: liftIO . print
 
+testAppending :: SchedulerIO MainScheduler Disposable
 testAppending = do
     hello
         `mappend` empty
-        >>: print
+        >>: liftIO . print
 
     hello
         `mappend` world
-        >>: print
+        >>: liftIO . print
 
     world
         `mappend` hello
-        >>: print
+        >>: liftIO . print
 
+testSubject :: SchedulerIO MainScheduler ()
 testSubject = do
-    (sub, sig) <- newSubject
-    sig >>: print
+    (sub, sig) <- liftIO $ newSubject
+    sig >>: liftIO . print
     send sub $ NextEvent "hello world"
 
+testUnlimitedReplaySubject :: SchedulerIO MainScheduler Disposable
 testUnlimitedReplaySubject = do
-    (sub, sig) <- newReplaySubject UnlimitedCapacity
+    (sub, sig) <- liftIO $ newReplaySubject UnlimitedCapacity
 
     send sub $ NextEvent "hello"
     send sub $ NextEvent "world"
     send sub CompletedEvent
 
-    sig >>: print
+    sig >>: liftIO . print
 
+testLimitedReplaySubject :: SchedulerIO MainScheduler Disposable
 testLimitedReplaySubject = do
-    (sub, sig) <- newReplaySubject $ LimitedCapacity 2
+    (sub, sig) <- liftIO $ newReplaySubject $ LimitedCapacity 2
 
     send sub $ NextEvent "hello"
     send sub $ NextEvent "world"
     send sub CompletedEvent
 
-    sig >>: print
+    sig >>: liftIO . print
 
+testFirst :: SchedulerIO MainScheduler ()
 testFirst = do
-    (sub, sig) <- newReplaySubject $ LimitedCapacity 1
+    (sub, sig) <- liftIO $ newReplaySubject $ LimitedCapacity 1
     send sub $ NextEvent "foobar"
 
-    ev <- first sig
-    print ev
+    ev <- liftIO $ first sig
+    liftIO $ print ev
 
+testFilter :: SchedulerIO MainScheduler Disposable
 testFilter = do
     hello
         `mappend` world
         `filter` (\(x:xs) -> x == 'h')
-        >>: print
+        >>: liftIO . print
 
+testDoEvent :: SchedulerIO MainScheduler Disposable
 testDoEvent = do
     hello
-        `doEvent` (\_ -> putStrLn "event")
-        >>: print
+        `doEvent` (\_ -> liftIO $ putStrLn "event")
+        >>: liftIO . print
 
+testDoNext :: SchedulerIO MainScheduler Disposable
 testDoNext = do
     hello
-        `doNext` (\_ -> putStrLn "next")
-        >>: print
+        `doNext` (\_ -> liftIO $ putStrLn "next")
+        >>: liftIO . print
 
+testDoCompleted :: SchedulerIO MainScheduler Disposable
 testDoCompleted = do
     hello
-        `doCompleted` putStrLn "completed"
-        >>: print
+        `doCompleted` (liftIO $ putStrLn "completed")
+        >>: liftIO . print
 
+testTake :: SchedulerIO MainScheduler Disposable
 testTake = do
     fromFoldable ["foo", "bar", "buzz", "baz"]
         `take` 2
-        >>: print
+        >>: liftIO . print
 
+testDrop :: SchedulerIO MainScheduler Disposable
 testDrop = do
     fromFoldable ["foo", "bar", "buzz", "baz"]
         `drop` 2
-        >>: print
+        >>: liftIO . print
 
+testZip :: SchedulerIO MainScheduler Disposable
 testZip = do
-    let zipSub (NextEvent (a, b)) = putStrLn $ a ++ " / " ++ b
-        zipSub x = print x
+    let zipSub (NextEvent (a, b)) = liftIO $ putStrLn $ a ++ " / " ++ b
+        zipSub x = liftIO $ print x
 
     mzip (fromFoldable ["foo", "bar"]) (fromFoldable ["buzz", "baz"])
         >>: zipSub
 
+testMaterialize :: SchedulerIO MainScheduler Disposable
 testMaterialize = do
     materialize hello
-        >>: print
+        >>: liftIO . print
 
     dematerialize (materialize hello)
-        >>: print
+        >>: liftIO . print
 
+testScheduling :: IO ()
 testScheduling = do
     s <- newScheduler
     s' <- newScheduler
-    mapM_ (schedule s . print) [1..50]
-    mapM_ (schedule s' . print) [1..50]
+    mapM_ (schedule s . liftIO . print) [1..50]
+    mapM_ (schedule s' . liftIO . print) [1..50]
 
+testScheduledSignal :: IO Disposable
 testScheduledSignal = do
     s <- newScheduler
     sig <- start s $ \sub -> do
         send sub $ NextEvent "foo"
         send sub $ NextEvent "bar"
         send sub CompletedEvent
-    sig >>: print
 
+    schedule s $ void (sig >>: liftIO . print)
+
+testMainScheduler :: IO ()
 testMainScheduler = do
     s <- getMainScheduler
-    schedule s $ putStrLn "hello"
-    schedule s $ putStrLn "world"
+    schedule s $ liftIO $ putStrLn "hello"
+    schedule s $ liftIO $ putStrLn "world"
     runMainScheduler
 
+testMerging :: SchedulerIO MainScheduler ()
 testMerging = do
-    (sub, sig) <- newSubject
-    (sub', sig') <- newSubject
+    (sub, sig) <- liftIO newSubject
+    (sub', sig') <- liftIO newSubject
 
-    sig `mplus` sig' >>: print
+    sig `mplus` sig' >>: liftIO . print
 
     send sub $ NextEvent "foo"
     send sub' $ NextEvent "bar"
@@ -149,10 +170,11 @@ testMerging = do
     send sub' $ NextEvent "buzz"
     send sub' CompletedEvent
 
+testSwitch :: SchedulerIO MainScheduler ()
 testSwitch = do
-    (outerSub, outerSig) <- newSubject
-    (innerSub, innerSig) <- newSubject
-    switch outerSig >>: print
+    (outerSub, outerSig) <- liftIO newSubject
+    (innerSub, innerSig) <- liftIO newSubject
+    switch outerSig >>: liftIO . print
 
     send outerSub $ NextEvent $ fromFoldable ["1", "2"]
     send outerSub $ NextEvent innerSig
@@ -163,11 +185,12 @@ testSwitch = do
     
     send innerSub CompletedEvent
 
+testCombine :: SchedulerIO MainScheduler ()
 testCombine = do
-    (sub, sig) <- newSubject
-    (sub', sig') <- newSubject
+    (sub, sig) <- liftIO newSubject
+    (sub', sig') <- liftIO newSubject
 
-    sig `combine` sig' >>: print
+    sig `combine` sig' >>: liftIO . print
 
     send sub $ NextEvent "foo"
     send sub' $ NextEvent "bar"
