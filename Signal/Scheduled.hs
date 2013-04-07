@@ -6,14 +6,18 @@ module Signal.Scheduled ( start
                         , newScheduler
                         , subscribeOn
                         , deliverOn
+                        , first
                         ) where
 
+import Control.Concurrent.MVar
 import Control.Monad
 import Control.Monad.IO.Class
 import Disposable
+import Prelude hiding (take)
 import Scheduler
 import Scheduler.Internal
 import Signal
+import Signal.Operators
 import Subject
 
 -- | Retrieves the underlying 'IO' action from a 'SchedulerIO' action.
@@ -66,3 +70,19 @@ deliverOn sig sch =
 
             SchedulerIO $ unwrap $ sig >>: forward
     in signal onSubscribe
+
+-- | Synchronously waits for the signal to send an event.
+first :: forall s v. Scheduler s => Signal s v -> IO (Event v)
+first s = do
+    var <- newEmptyMVar
+
+    let onEvent :: Event v -> SchedulerIO s ()
+        onEvent ev = void $ liftIO $ tryPutMVar var ev
+        
+        subscribe :: SchedulerIO s Disposable
+        subscribe = take s 1 >>: onEvent
+
+    unwrap subscribe
+    ev <- takeMVar var
+
+    return ev
