@@ -18,7 +18,7 @@ import Scheduler
 import Scheduler.Internal
 import Signal
 import Signal.Operators
-import Channel
+import Signal.Channel
 
 -- | Starts a signal which executes @action@ on @s@.
 start :: Scheduler s => s -> (Subscriber s v -> SchedulerIO s ()) -> IO (Signal s v)

@@ -21,10 +21,10 @@ import Data.Monoid
 import Data.Sequence as Seq
 import Data.Word
 import Disposable
-import Event
 import Prelude hiding (length, drop, zip)
 import Scheduler.Internal
-import Subscriber
+import Signal.Event
+import Signal.Subscriber
 
 -- | A signal which will send values of type @v@ on a scheduler of type @s@.
 data Signal s v where

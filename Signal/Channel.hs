@@ -1,12 +1,12 @@
 {-# LANGUAGE Safe #-}
 
-module Channel ( newChannel
-               , newReplayChannel
-               , Channel
-               , Subscriber
-               , send
-               , ChannelCapacity(..)
-               ) where
+module Signal.Channel ( newChannel
+                      , newReplayChannel
+                      , Channel
+                      , Subscriber
+                      , send
+                      , ChannelCapacity(..)
+                      ) where
 
 import Control.Concurrent.STM
 import Control.Monad.Trans.Class
@@ -20,7 +20,7 @@ import Disposable
 import Prelude hiding (mapM_, length, drop)
 import Scheduler
 import Signal
-import Subscriber
+import Signal.Subscriber
 
 -- | A controllable signal, represented by a subscriber and signal pair.
 -- |

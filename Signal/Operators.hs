@@ -27,7 +27,7 @@ import Prelude hiding (filter, take, drop)
 import Disposable
 import Scheduler
 import Signal
-import Subscriber
+import Signal.Subscriber
 
 -- | Turns any Foldable into a signal.
 fromFoldable :: (Foldable t, Scheduler s) => t v -> Signal s v

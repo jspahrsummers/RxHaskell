@@ -9,9 +9,9 @@ import Disposable
 import Scheduler
 import Scheduler.Main
 import Signal
+import Signal.Channel
 import Signal.Operators
 import Signal.Scheduled
-import Channel
 
 hello = fromFoldable ["hello"]
 world = fromFoldable ["world"]

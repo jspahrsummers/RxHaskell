@@ -1,10 +1,10 @@
 {-# LANGUAGE Safe #-}
 
-module Subscriber ( Subscriber
-                  , subscriber
-                  , send
-                  , Event(..)
-                  ) where
+module Signal.Subscriber ( Subscriber
+                         , subscriber
+                         , send
+                         , Event(..)
+                         ) where
 
 import Control.Applicative
 import Control.Concurrent
@@ -13,8 +13,8 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Data.Word
 import Disposable
-import Event
 import Scheduler
+import Signal.Event
 
 -- | Receives events from a signal with values of type @v@ and running in a scheduler of type @s@.
 -- |

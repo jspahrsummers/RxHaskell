@@ -1,7 +1,7 @@
 {-# LANGUAGE Safe #-}
 
-module Event ( Event(..)
-             ) where
+module Signal.Event ( Event(..)
+                    ) where
 
 import Control.Exception
 
