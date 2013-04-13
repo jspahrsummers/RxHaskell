@@ -11,6 +11,7 @@ import Scheduler.Internal (unsafeRunSchedulerIO)
 import Scheduler.Main
 import Signal
 import Signal.Channel
+import Signal.Command
 import Signal.Connection
 import Signal.Operators
 import Signal.Scheduled
@@ -212,3 +213,12 @@ testReplay :: SchedulerIO MainScheduler Disposable
 testReplay = do
     sig <- replay $ hello `mappend` world
     sig >>: liftIO . print
+
+testCommand :: SchedulerIO MainScheduler Bool
+testCommand = do
+    c <- newCommand ExecuteSerially $ return True
+
+    executing c >>: liftIO . print
+    values c >>: liftIO . print
+
+    execute c 5
