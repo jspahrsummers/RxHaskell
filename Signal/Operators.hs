@@ -9,6 +9,7 @@ module Signal.Operators ( fromFoldable
                         , doNext
                         , doError
                         , doCompleted
+                        , finally
                         , take
                         , drop
                         , switch
@@ -19,7 +20,7 @@ module Signal.Operators ( fromFoldable
                         ) where
 
 import Control.Concurrent.STM
-import Control.Exception
+import Control.Exception hiding (finally)
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Foldable
@@ -84,6 +85,13 @@ doCompleted :: Scheduler s => Signal s v -> SchedulerIO s () -> Signal s v
 doCompleted s f =
     let f' CompletedEvent = f
         f' _ = return ()
+    in doEvent s f'
+
+-- | Runs a side-effecting action when the signal completes or errors.
+finally :: Scheduler s => Signal s v -> SchedulerIO s () -> Signal s v
+finally s f =
+    let f' (NextEvent _) = return ()
+        f' _ = f
     in doEvent s f'
 
 -- | Returns a signal of the first @n@ elements.
