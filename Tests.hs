@@ -222,3 +222,17 @@ testCommand = do
     values c >>: liftIO . print
 
     execute c 5
+
+testOnExecute :: SchedulerIO MainScheduler ()
+testOnExecute = do
+    c <- newCommand ExecuteSerially $ return True :: SchedulerIO MainScheduler (Command Integer)
+
+    onExecute c $ \v ->
+        signal $ \sub -> do
+            mapM_ (liftIO . print) [1..v]
+            -- FIXME
+            --send sub $ ErrorEvent $ userError "Test error"
+            return EmptyDisposable
+
+    errors c >>: liftIO . print
+    void $ execute c 20
