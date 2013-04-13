@@ -63,22 +63,28 @@ newCommand p ces = do
     -- Start with True for 'canExecute'.
     combine (return True `mappend` ces) (snd exChan) >>: onEvent
 
-    -- Set the starting value for 'executing'.
-    send (fst exChan) $ NextEvent False
+    let command = Command {
+            policy = p,
+            valuesChannel = vChan,
+            errorsChannel = errChan,
+            itemsInFlight = items,
+            executingChannel = exChan,
+            canExecuteChannel = ceChan
+        }
 
-    return Command {
-        policy = p,
-        valuesChannel = vChan,
-        errorsChannel = errChan,
-        itemsInFlight = items,
-        executingChannel = exChan,
-        canExecuteChannel = ceChan
-    }
+    -- Set the starting value for 'executing'.
+    setExecuting command False
+
+    return command
 
 -- | Sends whether this command is currently executing.
 -- | This signal will always send at least one value immediately upon subscription.
 executing :: Scheduler s => Command s v -> Signal s Bool
 executing = snd . executingChannel
+
+-- | Sends a new value for 'executing'.
+setExecuting :: Scheduler s => Command s v -> Bool -> SchedulerIO s ()
+setExecuting c b = send (fst $ executingChannel c) $ NextEvent b
 
 -- | A signal of errors received from all signals created by 'doExecute'.
 errors :: Command s v -> Signal MainScheduler IOException
@@ -107,13 +113,13 @@ execute c v = do
         execute' = do
             liftIO $ putMVar (itemsInFlight c) $ items + 1
 
-            send (fst $ executingChannel c) $ NextEvent True
+            setExecuting c True
             fst (valuesChannel c) `send` NextEvent v
 
             items <- liftIO $ modifyMVar (itemsInFlight c) $ \items ->
                 return $ (items - 1, items - 1)
 
-            when (items == 0) $ send (fst $ executingChannel c) $ NextEvent False
+            when (items == 0) $ setExecuting c False
             return True
 
     ce <- liftIO $ first $ canExecute c
