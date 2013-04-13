@@ -12,6 +12,7 @@ module Signal.Operators ( fromFoldable
                         , finally
                         , take
                         , drop
+                        , map
                         , switch
                         , combine
                         , never
@@ -26,7 +27,7 @@ import Control.Monad.IO.Class
 import Data.Foldable
 import Data.IORef
 import Data.Monoid
-import Prelude hiding (filter, take, drop)
+import Prelude hiding (filter, take, drop, map)
 import Disposable
 import Scheduler
 import Signal
@@ -130,6 +131,10 @@ drop s n =
             onEvent ev = send sub ev
 
         s >>: onEvent
+
+-- | Returns a signal of mapped values.
+map :: Scheduler s => Signal s v -> (v -> w) -> Signal s w
+map = flip fmap
 
 -- | Returns a signal that sends the values from the most recently sent signal.
 switch :: forall s v. Scheduler s => Signal s (Signal s v) -> Signal s v
