@@ -7,9 +7,11 @@ import Data.Monoid
 import Prelude hiding (filter, take, drop)
 import Disposable
 import Scheduler
+import Scheduler.Internal (unsafeRunSchedulerIO)
 import Scheduler.Main
 import Signal
 import Signal.Channel
+import Signal.Connection
 import Signal.Operators
 import Signal.Scheduled
 
@@ -198,3 +200,10 @@ testCombine = do
     send sub' CompletedEvent
     send sub $ NextEvent "buzz"
     send sub CompletedEvent
+
+testConnection :: SchedulerIO MainScheduler ()
+testConnection = do
+    conn <- liftIO $ publish $ hello `mappend` world
+
+    multicastedSignal conn >>: liftIO . print
+    void $ connect conn
