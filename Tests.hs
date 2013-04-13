@@ -207,3 +207,8 @@ testConnection = do
 
     multicastedSignal conn >>: liftIO . print
     void $ connect conn
+
+testReplay :: SchedulerIO MainScheduler Disposable
+testReplay = do
+    sig <- replay $ hello `mappend` world
+    sig >>: liftIO . print

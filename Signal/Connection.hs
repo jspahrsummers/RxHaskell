@@ -44,13 +44,23 @@ multicast sig chan = do
 publish :: Scheduler s => Signal s v -> IO (Connection s v)
 publish sig = newChannel >>= multicast sig
 
--- | Multicasts to a replay channel of unlimited capacity.
-replay :: Scheduler s => Signal s v -> IO (Connection s v)
-replay sig = newReplayChannel UnlimitedCapacity >>= multicast sig
+-- | Multicasts to a replay channel of unlimited capacity, then connects immediately.
+replay :: Scheduler s => Signal s v -> SchedulerIO s (Signal s v)
+replay sig = do
+    chan <- liftIO $ newReplayChannel UnlimitedCapacity
+    conn <- liftIO $ multicast sig chan
+    
+    connect conn
+    return $ multicastedSignal conn
 
--- | Multicasts to a replay channel of capacity 1.
-replayLast :: Scheduler s => Signal s v -> IO (Connection s v)
-replayLast sig = newReplayChannel (LimitedCapacity 1) >>= multicast sig
+-- | Multicasts to a replay channel of capacity 1, then connects immediately.
+replayLast :: Scheduler s => Signal s v -> SchedulerIO s (Signal s v)
+replayLast sig = do
+    chan <- liftIO $ newReplayChannel $ LimitedCapacity 1
+    conn <- liftIO $ multicast sig chan
+    
+    connect conn
+    return $ multicastedSignal conn
 
 -- | Returns the multicasted signal of a connection.
 -- | No events will be sent on the resulting signal until 'connect' is invoked.
