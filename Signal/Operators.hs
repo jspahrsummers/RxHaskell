@@ -7,6 +7,7 @@ module Signal.Operators ( fromFoldable
                         , filter
                         , doEvent
                         , doNext
+                        , doError
                         , doCompleted
                         , take
                         , drop
@@ -18,6 +19,7 @@ module Signal.Operators ( fromFoldable
                         ) where
 
 import Control.Concurrent.STM
+import Control.Exception
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Foldable
@@ -67,6 +69,13 @@ doEvent s f =
 doNext :: Scheduler s => Signal s v -> (v -> SchedulerIO s ()) -> Signal s v
 doNext s f =
     let f' (NextEvent x) = f x
+        f' _ = return ()
+    in doEvent s f'
+
+-- | Runs a side-effecting action whenever the signal sends an error.
+doError :: Scheduler s => Signal s v -> (IOException -> SchedulerIO s ()) -> Signal s v
+doError s f =
+    let f' (ErrorEvent ex) = f ex
         f' _ = return ()
     in doEvent s f'
 
