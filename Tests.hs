@@ -212,3 +212,12 @@ testReplay :: SchedulerIO MainScheduler Disposable
 testReplay = do
     sig <- replay $ hello `mappend` world
     sig >>: liftIO . print
+
+testSubscriberDisposal :: SchedulerIO MainScheduler Disposable
+testSubscriberDisposal =
+    let s = signal $ \sub -> do
+        send sub $ NextEvent "hello"
+        send sub CompletedEvent
+        send sub $ NextEvent "world"
+        return EmptyDisposable
+    in s >>: liftIO . print
