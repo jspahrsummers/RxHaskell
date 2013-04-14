@@ -7,27 +7,14 @@ module Signal.Subscriber ( Subscriber
                          , Event(..)
                          ) where
 
-import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Monad
 import Control.Monad.IO.Class
-import Data.Word
 import Disposable
 import Scheduler
 import Signal.Event
-
--- | Receives events from a signal with values of type @v@ and running in a scheduler of type @s@.
--- |
--- | Note that @s@ refers to the scheduler that events must be sent on. Events are always sent
--- | synchronously, regardless of @s@.
-data Subscriber s v = Subscriber {
-    onEvent :: Event v -> SchedulerIO s (),
-    disposables :: DisposableSet,
-    lockedThread :: TVar ThreadId,
-    threadLockCounter :: TVar Word32,
-    disposed :: TVar Bool
-}
+import Signal.Subscriber.Internal
 
 -- | Constructs a subscriber.
 subscriber :: Scheduler s => (Event v -> SchedulerIO s ()) -> IO (Subscriber s v)
