@@ -6,7 +6,7 @@ module Scheduler.Internal ( SchedulerIO(..)
                           , ScheduledAction
                           , Scheduler(..)
                           , BackgroundScheduler(..)
-                          , MainScheduler(..)
+                          , newScheduledAction
                           , executeScheduledAction
                           ) where
 
@@ -90,19 +90,6 @@ instance Scheduler BackgroundScheduler where
 
         -- If the queue is empty, let this thread die.
         maybe (return ()) (executeScheduledAction s) m
-
--- | A scheduler which runs enqueued actions on the main thread.
-newtype MainScheduler = MainScheduler (TQueue (ScheduledAction MainScheduler))
-
-instance Scheduler MainScheduler where
-    schedule (MainScheduler q) action = do
-        (sa, d) <- newScheduledAction action
-        atomically $ writeTQueue q sa
-        return d
-
-    schedulerMain s@(MainScheduler q) = do
-        sa <- atomically $ readTQueue q
-        executeScheduledAction s sa
 
 -- | Executes the given action, then re-enters 'schedulerMain'.
 executeScheduledAction :: Scheduler s => s -> ScheduledAction s -> IO ()

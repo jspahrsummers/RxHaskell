@@ -13,6 +13,19 @@ import Scheduler
 import Scheduler.Internal
 import System.IO.Unsafe
 
+-- | A scheduler which runs enqueued actions on the main thread.
+newtype MainScheduler = MainScheduler (TQueue (ScheduledAction MainScheduler))
+
+instance Scheduler MainScheduler where
+    schedule (MainScheduler q) action = do
+        (sa, d) <- newScheduledAction action
+        atomically $ writeTQueue q sa
+        return d
+
+    schedulerMain s@(MainScheduler q) = do
+        sa <- atomically $ readTQueue q
+        executeScheduledAction s sa
+
 -- ohai global variable
 mainSchedulerRef :: IORef MainScheduler
 {-# NOINLINE mainSchedulerRef #-}
