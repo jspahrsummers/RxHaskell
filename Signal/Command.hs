@@ -59,8 +59,12 @@ newCommand p ces = do
     ceChan <- liftIO $ newReplayChannel $ LimitedCapacity 1
     items <- liftIO $ newMVar 0
 
-    let onEvent :: Event (Bool, Bool) -> SchedulerIO MainScheduler ()
-        onEvent (NextEvent (ce, ex)) = send (fst ceChan) $ NextEvent $ ce && not ex
+    let canExecute :: Bool -> Bool -> CommandPolicy -> Bool
+        canExecute ce executing ExecuteSerially = ce && not executing
+        canExecute ce _ ExecuteConcurrently = ce
+    
+        onEvent :: Event (Bool, Bool) -> SchedulerIO MainScheduler ()
+        onEvent (NextEvent (ce, ex)) = send (fst ceChan) $ NextEvent $ canExecute ce ex p
         onEvent _ = return ()
 
     -- Start with True for 'canExecute'.

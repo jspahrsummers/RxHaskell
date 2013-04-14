@@ -224,19 +224,27 @@ testCommand = do
 
     execute c 5
 
-testOnExecute :: SchedulerIO MainScheduler ()
+testOnExecute :: IO ()
 testOnExecute = do
-    c <- newCommand ExecuteSerially $ return True :: SchedulerIO MainScheduler (Command Integer)
+    sch <- getMainScheduler
 
-    onExecute c $ \v ->
-        signal $ \sub -> do
-            mapM_ (liftIO . print) [1..v]
-            -- FIXME
-            --send sub $ ErrorEvent $ userError "Test error"
-            return EmptyDisposable
+    schedule sch $ do
+        c <- newCommand ExecuteConcurrently $ return True
 
-    errors c >>: liftIO . print
-    void $ execute c 20
+        onExecute c $ \v ->
+            signal $ \sub -> do
+                -- FIXME
+                --send sub $ ErrorEvent $ userError "Test error"
+                liftIO $ schedule sch $ mapM_ (liftIO . print) v
+
+        executing c >>: \e -> liftIO $ putStrLn $ "executing: " ++ show e
+        errors c >>: \err -> liftIO $ putStrLn $ "error: " ++ show err
+
+        execute c [1..20]
+        execute c [20..40]
+        return ()
+
+    runMainScheduler
 
 testSubscriberDisposal :: SchedulerIO MainScheduler Disposable
 testSubscriberDisposal =
