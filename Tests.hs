@@ -16,6 +16,7 @@ import Signal.Command
 import Signal.Connection
 import Signal.Operators
 import Signal.Scheduled
+import System.Mem
 
 hello = fromFoldable ["hello"]
 world = fromFoldable ["world"]
@@ -263,6 +264,19 @@ testOnExecute = do
         execute c [20..40]
         return ()
 
+    runMainScheduler
+
+testCommandCompletion :: IO ()
+testCommandCompletion = do
+    sch <- getMainScheduler
+
+    schedule sch $ do
+        c <- newCommand ExecuteSerially $ return True
+
+        executing c >>: \e -> liftIO $ putStrLn $ "executing: " ++ show e
+        return ()
+
+    schedule sch $ liftIO performGC
     runMainScheduler
 
 testSubscriberDisposal :: SchedulerIO MainScheduler ()

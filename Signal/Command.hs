@@ -27,6 +27,7 @@ import Signal.Connection
 import Signal.Operators
 import Signal.Scheduled
 import Signal.Subscriber
+import System.Mem.Weak
 
 -- | Determines a command's behavior.
 data CommandPolicy = ExecuteSerially        -- ^ The command can only be executed once at a time.
@@ -37,7 +38,6 @@ data CommandPolicy = ExecuteSerially        -- ^ The command can only be execute
 -- | A signal triggered in response to some action, typically UI-related.
 data Command v = Command {
     policy :: CommandPolicy,
-    -- TODO: These channels never complete, causing subscribers to leak.
     valuesChannel :: Channel MainScheduler v,
     errorsChannel :: Channel MainScheduler IOException,
     itemsInFlight :: MVar Word32,
@@ -67,6 +67,15 @@ newCommand p ces = do
         onEvent (NextEvent (ce, ex)) = send (fst ceChan) $ NextEvent $ canExecute ce ex p
         onEvent _ = return ()
 
+        complete :: IO ()
+        complete = do
+            sch <- getMainScheduler
+            void $ schedule sch $ do
+                send (fst vChan) CompletedEvent
+                send (fst errChan) CompletedEvent
+                send (fst exChan) CompletedEvent
+                send (fst ceChan) CompletedEvent
+
     -- Start with True for 'canExecute'.
     combine (return True `mappend` ces) (snd exChan) >>: onEvent
 
@@ -82,6 +91,7 @@ newCommand p ces = do
     -- Set the starting value for 'executing'.
     setExecuting command False
 
+    liftIO $ addFinalizer command complete
     return command
 
 -- | Sends whether this command is currently executing.
