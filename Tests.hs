@@ -236,3 +236,12 @@ testOnExecute = do
 
     errors c >>: liftIO . print
     void $ execute c 20
+
+testSubscriberDisposal :: SchedulerIO MainScheduler Disposable
+testSubscriberDisposal =
+    let s = signal $ \sub -> do
+        send sub $ NextEvent "hello"
+        send sub CompletedEvent
+        send sub $ NextEvent "world"
+        return EmptyDisposable
+    in s >>: liftIO . print

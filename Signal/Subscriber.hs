@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Signal.Subscriber ( Subscriber
                          , subscriber
@@ -6,27 +7,14 @@ module Signal.Subscriber ( Subscriber
                          , Event(..)
                          ) where
 
-import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Monad
 import Control.Monad.IO.Class
-import Data.Word
 import Disposable
 import Scheduler
 import Signal.Event
-
--- | Receives events from a signal with values of type @v@ and running in a scheduler of type @s@.
--- |
--- | Note that @s@ refers to the scheduler that events must be sent on. Events are always sent
--- | synchronously, regardless of @s@.
-data Subscriber s v = Subscriber {
-    onEvent :: Event v -> SchedulerIO s (),
-    disposable :: Disposable,
-    lockedThread :: TVar ThreadId,
-    threadLockCounter :: TVar Word32,
-    disposed :: TVar Bool
-}
+import Signal.Subscriber.Internal
 
 -- | Constructs a subscriber.
 subscriber :: Scheduler s => (Event v -> SchedulerIO s ()) -> IO (Subscriber s v)
@@ -34,13 +22,16 @@ subscriber f = do
     b <- atomically $ newTVar False
     d <- newDisposable $ atomically $ writeTVar b True
 
+    ds <- newDisposableSet
+    addDisposable ds d
+
     tid <- myThreadId
     lt <- atomically $ newTVar tid
     tlc <- atomically $ newTVar 0
 
     return Subscriber {
         onEvent = f,
-        disposable = d,
+        disposables = ds,
         lockedThread = lt,
         threadLockCounter = tlc,
         disposed = b
@@ -75,12 +66,20 @@ releaseSubscriber sub tid = do
     writeTVar (threadLockCounter sub) $ tlc - 1
 
 -- | Synchronously sends an event to a subscriber.
-send :: Scheduler s => Subscriber s v -> Event v -> SchedulerIO s ()
+send :: forall s v. Scheduler s => Subscriber s v -> Event v -> SchedulerIO s ()
 send s ev =
-    let send' ev@(NextEvent _) = onEvent s ev
+    let sendAndDispose :: Event v -> SchedulerIO s ()
+        sendAndDispose ev = do
+            d <- liftIO $ toDisposable $ disposables s
+            liftIO $ dispose d
+
+            onEvent s ev
+        
+        send' :: Event v -> SchedulerIO s ()
+        send' ev@(NextEvent _) = onEvent s ev
         send' ev = do
-            d <- liftIO $ readTVarIO $ disposed s
-            unless d $ onEvent s ev
+            wasDisposed <- liftIO $ atomically $ swapTVar (disposed s) True
+            unless wasDisposed $ sendAndDispose ev
     in do
         tid <- liftIO myThreadId
         b <- liftIO $ atomically $ acquireSubscriber s tid

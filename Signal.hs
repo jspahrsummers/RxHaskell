@@ -25,6 +25,7 @@ import Prelude hiding (length, drop, zip)
 import Scheduler.Internal
 import Signal.Event
 import Signal.Subscriber
+import Signal.Subscriber.Internal
 
 -- | A signal which will send values of type @v@ on a scheduler of type @s@.
 data Signal s v where
@@ -41,7 +42,10 @@ subscribe
     -> Subscriber s v           -- ^ The subscriber to attach.
     -> SchedulerIO s Disposable -- ^ A disposable which can be used to terminate the subscription.
 
-subscribe (Signal f) = f
+subscribe (Signal f) sub = do
+    d <- f sub
+    liftIO $ addSubscriptionDisposable sub d
+    return d
 
 -- | Returns a signal which never sends any events.
 never :: Scheduler s => Signal s v
