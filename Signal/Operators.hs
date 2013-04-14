@@ -7,9 +7,12 @@ module Signal.Operators ( fromFoldable
                         , filter
                         , doEvent
                         , doNext
+                        , doError
                         , doCompleted
+                        , finally
                         , take
                         , drop
+                        , map
                         , switch
                         , combine
                         , never
@@ -18,12 +21,13 @@ module Signal.Operators ( fromFoldable
                         ) where
 
 import Control.Concurrent.STM
+import Control.Exception hiding (finally)
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Foldable
 import Data.IORef
 import Data.Monoid
-import Prelude hiding (filter, take, drop)
+import Prelude hiding (filter, take, drop, map)
 import Disposable
 import Scheduler
 import Signal
@@ -70,11 +74,25 @@ doNext s f =
         f' _ = return ()
     in doEvent s f'
 
+-- | Runs a side-effecting action whenever the signal sends an error.
+doError :: Scheduler s => Signal s v -> (IOException -> SchedulerIO s ()) -> Signal s v
+doError s f =
+    let f' (ErrorEvent ex) = f ex
+        f' _ = return ()
+    in doEvent s f'
+
 -- | Runs a side-effecting action when the signal completes.
 doCompleted :: Scheduler s => Signal s v -> SchedulerIO s () -> Signal s v
 doCompleted s f =
     let f' CompletedEvent = f
         f' _ = return ()
+    in doEvent s f'
+
+-- | Runs a side-effecting action when the signal completes or errors.
+finally :: Scheduler s => Signal s v -> SchedulerIO s () -> Signal s v
+finally s f =
+    let f' (NextEvent _) = return ()
+        f' _ = f
     in doEvent s f'
 
 -- | Returns a signal of the first @n@ elements.
@@ -113,6 +131,10 @@ drop s n =
             onEvent ev = send sub ev
 
         s >>: onEvent
+
+-- | Returns a signal of mapped values.
+map :: Scheduler s => Signal s v -> (v -> w) -> Signal s w
+map = flip fmap
 
 -- | Returns a signal that sends the values from the most recently sent signal.
 switch :: forall s v. Scheduler s => Signal s (Signal s v) -> Signal s v
