@@ -3,7 +3,6 @@
 module Scheduler ( Scheduler(schedule)
                  , SchedulerIO
                  , BackgroundScheduler
-                 , MainScheduler
                  , newScheduler
                  ) where
 

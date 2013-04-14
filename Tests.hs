@@ -9,16 +9,19 @@ import Disposable
 import Scheduler
 import Scheduler.Internal (unsafeRunSchedulerIO)
 import Scheduler.Main
+import Scheduler.Unsafe
 import Signal
 import Signal.Channel
+import Signal.Command
 import Signal.Connection
 import Signal.Operators
 import Signal.Scheduled
+import System.Mem
 
 hello = fromFoldable ["hello"]
 world = fromFoldable ["world"]
 
-testBinding :: SchedulerIO MainScheduler Disposable
+testBinding :: SchedulerIO MainScheduler ()
 testBinding =
     let ss =
             signal $ \sub -> do
@@ -26,14 +29,15 @@ testBinding =
                 send sub $ NextEvent world
                 send sub CompletedEvent
                 return EmptyDisposable
-    in join ss >>: liftIO . print
+    in void $ join ss >>: liftIO . print
 
-testSequencing :: SchedulerIO MainScheduler Disposable
+testSequencing :: SchedulerIO MainScheduler ()
 testSequencing = do
     hello >> world >>: liftIO . print
     world >> hello >>: liftIO . print
+    return ()
 
-testAppending :: SchedulerIO MainScheduler Disposable
+testAppending :: SchedulerIO MainScheduler ()
 testAppending = do
     hello
         `mappend` empty
@@ -47,13 +51,15 @@ testAppending = do
         `mappend` hello
         >>: liftIO . print
 
+    return ()
+
 testChannel :: SchedulerIO MainScheduler ()
 testChannel = do
     (sub, sig) <- liftIO newChannel
     sig >>: liftIO . print
     send sub $ NextEvent "hello world"
 
-testUnlimitedReplayChannel :: SchedulerIO MainScheduler Disposable
+testUnlimitedReplayChannel :: SchedulerIO MainScheduler ()
 testUnlimitedReplayChannel = do
     (sub, sig) <- liftIO $ newReplayChannel UnlimitedCapacity
 
@@ -61,9 +67,9 @@ testUnlimitedReplayChannel = do
     send sub $ NextEvent "world"
     send sub CompletedEvent
 
-    sig >>: liftIO . print
+    void $ sig >>: liftIO . print
 
-testLimitedReplayChannel :: SchedulerIO MainScheduler Disposable
+testLimitedReplayChannel :: SchedulerIO MainScheduler ()
 testLimitedReplayChannel = do
     (sub, sig) <- liftIO $ newReplayChannel $ LimitedCapacity 2
 
@@ -71,7 +77,7 @@ testLimitedReplayChannel = do
     send sub $ NextEvent "world"
     send sub CompletedEvent
 
-    sig >>: liftIO . print
+    void $ sig >>: liftIO . print
 
 testFirst :: SchedulerIO MainScheduler ()
 testFirst = do
@@ -81,44 +87,56 @@ testFirst = do
     ev <- liftIO $ first sig
     liftIO $ print ev
 
-testFilter :: SchedulerIO MainScheduler Disposable
+testFilter :: SchedulerIO MainScheduler ()
 testFilter = do
     hello
         `mappend` world
         `filter` (\(x:xs) -> x == 'h')
         >>: liftIO . print
 
-testDoEvent :: SchedulerIO MainScheduler Disposable
+    return ()
+
+testDoEvent :: SchedulerIO MainScheduler ()
 testDoEvent = do
     hello
         `doEvent` (\_ -> liftIO $ putStrLn "event")
         >>: liftIO . print
 
-testDoNext :: SchedulerIO MainScheduler Disposable
+    return ()
+
+testDoNext :: SchedulerIO MainScheduler ()
 testDoNext = do
     hello
         `doNext` (\_ -> liftIO $ putStrLn "next")
         >>: liftIO . print
 
-testDoCompleted :: SchedulerIO MainScheduler Disposable
+    return ()
+
+testDoCompleted :: SchedulerIO MainScheduler ()
 testDoCompleted = do
     hello
         `doCompleted` (liftIO $ putStrLn "completed")
         >>: liftIO . print
 
-testTake :: SchedulerIO MainScheduler Disposable
+    return ()
+
+testTake :: SchedulerIO MainScheduler ()
 testTake = do
     fromFoldable ["foo", "bar", "buzz", "baz"]
         `take` 2
         >>: liftIO . print
 
-testDrop :: SchedulerIO MainScheduler Disposable
+    return ()
+
+testDrop :: SchedulerIO MainScheduler ()
 testDrop = do
     fromFoldable ["foo", "bar", "buzz", "baz"]
         `drop` 2
         >>: liftIO . print
 
-testZip :: SchedulerIO MainScheduler Disposable
+    return ()
+
+testZip :: SchedulerIO MainScheduler ()
 testZip = do
     let zipSub (NextEvent (a, b)) = liftIO $ putStrLn $ a ++ " / " ++ b
         zipSub x = liftIO $ print x
@@ -126,13 +144,17 @@ testZip = do
     mzip (fromFoldable ["foo", "bar"]) (fromFoldable ["buzz", "baz"])
         >>: zipSub
 
-testMaterialize :: SchedulerIO MainScheduler Disposable
+    return ()
+
+testMaterialize :: SchedulerIO MainScheduler ()
 testMaterialize = do
     materialize hello
         >>: liftIO . print
 
     dematerialize (materialize hello)
         >>: liftIO . print
+
+    return ()
 
 testScheduling :: IO ()
 testScheduling = do
@@ -141,7 +163,7 @@ testScheduling = do
     mapM_ (schedule s . liftIO . print) [1..50]
     mapM_ (schedule s' . liftIO . print) [1..50]
 
-testScheduledSignal :: IO Disposable
+testScheduledSignal :: IO ()
 testScheduledSignal = do
     s <- newScheduler
     sig <- start s $ \sub -> do
@@ -149,7 +171,7 @@ testScheduledSignal = do
         send sub $ NextEvent "bar"
         send sub CompletedEvent
 
-    schedule s $ void (sig >>: liftIO . print)
+    void $ schedule s $ void (sig >>: liftIO . print)
 
 testMainScheduler :: IO ()
 testMainScheduler = do
@@ -208,16 +230,60 @@ testConnection = do
     multicastedSignal conn >>: liftIO . print
     void $ connect conn
 
-testReplay :: SchedulerIO MainScheduler Disposable
+testReplay :: SchedulerIO MainScheduler ()
 testReplay = do
     sig <- replay $ hello `mappend` world
-    sig >>: liftIO . print
+    void $ sig >>: liftIO . print
 
-testSubscriberDisposal :: SchedulerIO MainScheduler Disposable
+testCommand :: SchedulerIO MainScheduler Bool
+testCommand = do
+    c <- newCommand ExecuteSerially $ return True
+
+    executing c >>: liftIO . print
+    values c >>: liftIO . print
+
+    execute c 5
+
+testOnExecute :: IO ()
+testOnExecute = do
+    sch <- getMainScheduler
+
+    schedule sch $ do
+        c <- newCommand ExecuteConcurrently $ return True
+
+        onExecute c $ \v ->
+            signal $ \sub -> do
+                liftIO $ schedule sch $ mapM_ (liftIO . print) v
+                send sub $ ErrorEvent $ userError "Test error"
+                return EmptyDisposable
+
+        executing c >>: \e -> liftIO $ putStrLn $ "executing: " ++ show e
+        errors c >>: \err -> liftIO $ putStrLn $ "error: " ++ show err
+
+        execute c [1..20]
+        execute c [20..40]
+        return ()
+
+    runMainScheduler
+
+testCommandCompletion :: IO ()
+testCommandCompletion = do
+    sch <- getMainScheduler
+
+    schedule sch $ do
+        c <- newCommand ExecuteSerially $ return True
+
+        executing c >>: \e -> liftIO $ putStrLn $ "executing: " ++ show e
+        return ()
+
+    schedule sch $ liftIO performGC
+    runMainScheduler
+
+testSubscriberDisposal :: SchedulerIO MainScheduler ()
 testSubscriberDisposal =
     let s = signal $ \sub -> do
         send sub $ NextEvent "hello"
         send sub CompletedEvent
         send sub $ NextEvent "world"
         return EmptyDisposable
-    in s >>: liftIO . print
+    in void $ s >>: liftIO . print
