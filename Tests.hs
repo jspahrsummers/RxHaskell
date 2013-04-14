@@ -9,6 +9,7 @@ import Disposable
 import Scheduler
 import Scheduler.Internal (unsafeRunSchedulerIO)
 import Scheduler.Main
+import Scheduler.Unsafe
 import Signal
 import Signal.Channel
 import Signal.Command
