@@ -70,9 +70,7 @@ send :: forall s v. Scheduler s => Subscriber s v -> Event v -> SchedulerIO s ()
 send s ev =
     let sendAndDispose :: Event v -> SchedulerIO s ()
         sendAndDispose ev = do
-            d <- liftIO $ toDisposable $ disposables s
-            liftIO $ dispose d
-
+            liftIO $ disposeSubscriber s
             onEvent s ev
         
         send' :: Event v -> SchedulerIO s ()

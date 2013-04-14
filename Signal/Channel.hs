@@ -19,6 +19,7 @@ import Prelude hiding (mapM_, length, drop)
 import Scheduler
 import Signal
 import Signal.Subscriber
+import Signal.Subscriber.Internal
 
 -- | A controllable signal, represented by a subscriber and signal pair.
 -- |
@@ -47,19 +48,23 @@ newReplayChannel cap = do
     disposed <- atomically $ newTVar False
     events <- atomically $ newTVar Seq.empty
 
-    let addSubscriber :: Subscriber s v -> STM (Seq (Event v))
+    let addSubscriber :: Subscriber s v -> STM (Seq (Event v), Bool)
         addSubscriber sub = do
             d <- readTVar disposed
             unless d $ modifyTVar' subs (|> sub)
-            readTVar events
+
+            seq <- readTVar events
+            return (seq, d)
         
         s :: Signal s v
         s =
             signal $ \sub -> do
-                events <- liftIO $ atomically $ addSubscriber sub
+                (events, d) <- liftIO $ atomically $ addSubscriber sub
 
                 -- TODO: Allow these sends to be interrupted through disposal.
                 mapM_ (send sub) events
+                when d $ liftIO $ disposeSubscriber sub
+
                 return EmptyDisposable
 
         limit :: Int -> Seq (Event v) -> Seq (Event v)
