@@ -1,4 +1,5 @@
 {-# LANGUAGE Safe #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Signal.Subscriber ( Subscriber
                          , subscriber
@@ -22,7 +23,7 @@ import Signal.Event
 -- | synchronously, regardless of @s@.
 data Subscriber s v = Subscriber {
     onEvent :: Event v -> SchedulerIO s (),
-    disposable :: Disposable,
+    disposables :: DisposableSet,
     lockedThread :: TVar ThreadId,
     threadLockCounter :: TVar Word32,
     disposed :: TVar Bool
@@ -34,13 +35,16 @@ subscriber f = do
     b <- atomically $ newTVar False
     d <- newDisposable $ atomically $ writeTVar b True
 
+    ds <- newDisposableSet
+    addDisposable ds d
+
     tid <- myThreadId
     lt <- atomically $ newTVar tid
     tlc <- atomically $ newTVar 0
 
     return Subscriber {
         onEvent = f,
-        disposable = d,
+        disposables = ds,
         lockedThread = lt,
         threadLockCounter = tlc,
         disposed = b
@@ -75,12 +79,20 @@ releaseSubscriber sub tid = do
     writeTVar (threadLockCounter sub) $ tlc - 1
 
 -- | Synchronously sends an event to a subscriber.
-send :: Scheduler s => Subscriber s v -> Event v -> SchedulerIO s ()
+send :: forall s v. Scheduler s => Subscriber s v -> Event v -> SchedulerIO s ()
 send s ev =
-    let send' ev@(NextEvent _) = onEvent s ev
+    let sendAndDispose :: Event v -> SchedulerIO s ()
+        sendAndDispose ev = do
+            d <- liftIO $ toDisposable $ disposables s
+            liftIO $ dispose d
+
+            onEvent s ev
+        
+        send' :: Event v -> SchedulerIO s ()
+        send' ev@(NextEvent _) = onEvent s ev
         send' ev = do
-            d <- liftIO $ readTVarIO $ disposed s
-            unless d $ onEvent s ev
+            wasDisposed <- liftIO $ atomically $ swapTVar (disposed s) True
+            unless wasDisposed $ sendAndDispose ev
     in do
         tid <- liftIO myThreadId
         b <- liftIO $ atomically $ acquireSubscriber s tid
