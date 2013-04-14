@@ -234,11 +234,7 @@ testOnExecute = do
         onExecute c $ \v ->
             signal $ \sub -> do
                 liftIO $ schedule sch $ mapM_ (liftIO . print) v
-
-                -- FIXME
-                --send sub $ ErrorEvent $ userError "Test error"
-                send sub CompletedEvent
-
+                send sub $ ErrorEvent $ userError "Test error"
                 return EmptyDisposable
 
         executing c >>: \e -> liftIO $ putStrLn $ "executing: " ++ show e
