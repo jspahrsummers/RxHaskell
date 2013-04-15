@@ -1,8 +1,10 @@
 name:           RxHaskell
 version:        0.1
 stability:      alpha
-synopsis:       An implementation of Reactive Extensions for Haskell
-description:    Effectful functional reactive programming, based on Microsoft's Reactive Extensions for .NET: http://msdn.microsoft.com/en-us/library/hh242985(v=VS.103).aspx
+synopsis:       Reactive Extensions for Haskell
+description:    An implementation of functional reactive programming based on Microsoft's Reactive Extensions for .NET: <http://msdn.microsoft.com/en-us/library/hh242985(v=VS.103).aspx>.
+                .
+                RxHaskell offers a monadic API, making it easier to interleave side effects and imperative-style code.
 homepage:       https://github.com/jspahrsummers/RxHaskell
 bug-reports:    https://github.com/jspahrsummers/RxHaskell/issues
 category:       FRP
