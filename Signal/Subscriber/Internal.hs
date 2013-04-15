@@ -28,7 +28,7 @@ data Subscriber s v = Subscriber {
 -- | Adds a disposable representing a subscription to the subscriber.
 --   If the subscriber is later sent completed or error, the disposable will be disposed.
 addSubscriptionDisposable :: Subscriber s v -> Disposable -> IO ()
-addSubscriptionDisposable sub d = addDisposable (disposables sub) d
+addSubscriptionDisposable = addDisposable . disposables
 
 -- | Disposes the subscriber, preventing it from receiving any new events.
 disposeSubscriber :: Subscriber s v -> IO ()

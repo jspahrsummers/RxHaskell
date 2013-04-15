@@ -141,7 +141,7 @@ execute c v = do
             fst (valuesChannel c) `send` NextEvent v
 
             items <- liftIO $ modifyMVar (itemsInFlight c) $ \items ->
-                return $ (items - 1, items - 1)
+                return (items - 1, items - 1)
 
             when (items == 0) $ setExecuting c False
             return True

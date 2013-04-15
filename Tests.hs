@@ -60,25 +60,21 @@ testChannel = do
     sig >>: liftIO . print
     send sub $ NextEvent "hello world"
 
-testUnlimitedReplayChannel :: SchedulerIO MainScheduler ()
-testUnlimitedReplayChannel = do
-    (sub, sig) <- liftIO $ newReplayChannel UnlimitedCapacity
+testReplayChannel :: ChannelCapacity -> SchedulerIO MainScheduler ()
+testReplayChannel c = do
+    (sub, sig) <- liftIO $ newReplayChannel c
 
     send sub $ NextEvent "hello"
     send sub $ NextEvent "world"
     send sub CompletedEvent
 
     void $ sig >>: liftIO . print
+
+testUnlimitedReplayChannel :: SchedulerIO MainScheduler ()
+testUnlimitedReplayChannel = testReplayChannel UnlimitedCapacity
 
 testLimitedReplayChannel :: SchedulerIO MainScheduler ()
-testLimitedReplayChannel = do
-    (sub, sig) <- liftIO $ newReplayChannel $ LimitedCapacity 2
-
-    send sub $ NextEvent "hello"
-    send sub $ NextEvent "world"
-    send sub CompletedEvent
-
-    void $ sig >>: liftIO . print
+testLimitedReplayChannel = testReplayChannel $ LimitedCapacity 2
 
 testFirst :: SchedulerIO MainScheduler ()
 testFirst = do
@@ -116,7 +112,7 @@ testDoNext = do
 testDoCompleted :: SchedulerIO MainScheduler ()
 testDoCompleted = do
     hello
-        `doCompleted` (liftIO $ putStrLn "completed")
+        `doCompleted` liftIO (putStrLn "completed")
         >>: liftIO . print
 
     return ()
