@@ -2,6 +2,7 @@
 
 module Scheduler ( Scheduler(schedule)
                  , SchedulerIO
+                 , getCurrentScheduler
                  , BackgroundScheduler
                  , newScheduler
                  ) where

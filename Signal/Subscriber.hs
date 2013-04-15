@@ -65,10 +65,11 @@ acquireSubscriber sub tid = do
 releaseSubscriber :: Subscriber s v -> ThreadId -> STM ()
 releaseSubscriber sub tid = do
     -- TODO: Skip all this synchronization for singleton scheduler types.
-    always $ fmap (== tid) $ readTVar (lockedThread sub)
+    ltid <- readTVar $ lockedThread sub
+    unless (ltid == tid) $ throwSTM $ userError $ "Locked thread " ++ show ltid ++ " does not match current thread " ++ show tid
 
     tlc <- readTVar (threadLockCounter sub)
-    always $ return $ tlc > 0
+    unless (tlc > 0) $ throwSTM $ userError "Thread lock count is not greater than zero"
 
     writeTVar (threadLockCounter sub) $ tlc - 1
 

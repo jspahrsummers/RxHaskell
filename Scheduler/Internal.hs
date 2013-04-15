@@ -2,7 +2,7 @@
 {-# LANGUAGE Safe #-}
 
 module Scheduler.Internal ( SchedulerIO(..)
-                          , unsafeRunSchedulerIO
+                          , getCurrentScheduler
                           , Scheduler(..)
                           , BackgroundScheduler(..)
                           , ScheduledAction
@@ -21,27 +21,26 @@ import Disposable
 
 -- | An 'IO' computation that must be performed in a scheduler of type @s@.
 data SchedulerIO s a where
-    SchedulerIO :: Scheduler s => IO a -> SchedulerIO s a
+    SchedulerIO :: Scheduler s => (s -> IO a) -> SchedulerIO s a
 
--- | Extracts the underlying 'IO' action from a 'SchedulerIO' action.
---
---   This can be unsafe because the type system does not have enough information to determine
---   whether the calling code is running on an appropriate scheduler.
-unsafeRunSchedulerIO :: Scheduler s => SchedulerIO s a -> IO a
-unsafeRunSchedulerIO (SchedulerIO action) = action
+-- | Returns the scheduler that the calling code is executing on.
+getCurrentScheduler :: Scheduler s => SchedulerIO s s
+getCurrentScheduler = SchedulerIO return
 
 instance Functor (SchedulerIO s) where
-    fmap f (SchedulerIO action) = SchedulerIO $ fmap f action
+    fmap f (SchedulerIO mf) = SchedulerIO $ fmap f . mf
 
 instance Scheduler s => Monad (SchedulerIO s) where
-    return = SchedulerIO . return
-    (SchedulerIO action) >>= f =
-        SchedulerIO $ do
-            v <- action
-            unsafeRunSchedulerIO $ f v
+    return v = SchedulerIO $ \_ -> return v
+    (SchedulerIO mf) >>= f =
+        SchedulerIO $ \sch -> do
+            v <- mf sch
+
+            let unwrap sch (SchedulerIO mf') = mf' sch
+            unwrap sch $ f v
 
 instance Scheduler s => MonadIO (SchedulerIO s) where
-    liftIO = SchedulerIO
+    liftIO action = SchedulerIO $ \_ -> action
 
 instance Scheduler s => Applicative (SchedulerIO s) where
     pure = return
@@ -93,9 +92,9 @@ instance Scheduler BackgroundScheduler where
 
 -- | Executes the given action, then re-enters 'schedulerMain'.
 executeScheduledAction :: Scheduler s => s -> ScheduledAction s -> IO ()
-executeScheduledAction s (ScheduledAction ref (SchedulerIO action)) = do
+executeScheduledAction s (ScheduledAction ref (SchedulerIO mf)) = do
     d <- readIORef ref
-    unless d action
+    unless d $ mf s
 
     yield
     schedulerMain s

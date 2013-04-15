@@ -7,7 +7,6 @@ import Data.Monoid
 import Prelude hiding (filter, take, drop)
 import Disposable
 import Scheduler
-import Scheduler.Internal (unsafeRunSchedulerIO)
 import Scheduler.Main
 import Scheduler.Unsafe
 import Signal
@@ -81,7 +80,7 @@ testFirst = do
     (sub, sig) <- liftIO $ newReplayChannel $ LimitedCapacity 1
     send sub $ NextEvent "foobar"
 
-    ev <- liftIO $ first sig
+    ev <- first sig
     liftIO $ print ev
 
 testFilter :: SchedulerIO MainScheduler ()

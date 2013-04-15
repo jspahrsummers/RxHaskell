@@ -16,7 +16,6 @@ import Control.Monad.IO.Class
 import Disposable
 import Prelude hiding (take)
 import Scheduler
-import Scheduler.Internal
 import Signal
 import Signal.Channel
 import Signal.Operators
@@ -30,55 +29,49 @@ start s action = do
     return sig
 
 -- | Returns a signal which subscribes to @sig@ on scheduler @sch@.
-subscribeOn :: forall s t v. (Scheduler s, Scheduler t) => Signal s v -> t -> Signal t v
+subscribeOn :: forall s v. Scheduler s => Signal s v -> s -> Signal s v
 subscribeOn sig sch =
-    let onSubscribe :: Subscriber t v -> SchedulerIO t Disposable
+    let onSubscribe :: Subscriber s v -> SchedulerIO s Disposable
         onSubscribe sub = do
             ds <- liftIO newDisposableSet
 
-            let forward :: Event v -> SchedulerIO s ()
-                forward ev = SchedulerIO $ unsafeRunSchedulerIO $ sub `send` ev
-
-                subscribe :: SchedulerIO t ()
-                subscribe = do
-                    d <- SchedulerIO $ unsafeRunSchedulerIO $ sig >>: forward
-                    liftIO $ ds `addDisposable` d
-
-            schD <- liftIO $ sch `schedule` subscribe
+            schD <- liftIO $ schedule sch $ do
+                d <- subscribe sig sub
+                liftIO $ ds `addDisposable` d
 
             liftIO $ ds `addDisposable` schD
             liftIO $ toDisposable ds
     in signal onSubscribe
 
--- | Returns a signal which delivers the events of @sig@ on scheduler @sch@.
-deliverOn :: forall s t v. (Scheduler s, Scheduler t) => Signal s v -> t -> Signal t v
-deliverOn sig sch =
+-- | Returns a signal which subscribes to @sig@ on scheduler @schA@ and delivers its events onto scheduler @schB@.
+deliverOn :: forall s t v. (Scheduler s, Scheduler t) => Signal s v -> s -> t -> Signal t v
+deliverOn sig schA schB =
     let onSubscribe :: Subscriber t v -> SchedulerIO t Disposable
-        onSubscribe sub = do
-            -- Although we could hold onto any disposable returned from scheduling,
-            -- the complexity of managing all of them probably isn't worth the
-            -- slightly faster cancellation.
-            let deliver :: t -> Event v -> SchedulerIO s Disposable
-                deliver sch ev =
-                    let sio = SchedulerIO $ unsafeRunSchedulerIO $ sub `send` ev
-                    in liftIO $ sch `schedule` sio
+        onSubscribe sub =
+            let forward :: Event v -> SchedulerIO s ()
+                forward ev =
+                    -- Although we could hold onto any disposable returned from scheduling,
+                    -- the complexity of managing all of them probably isn't worth the
+                    -- slightly faster cancellation.
+                    void $ liftIO $ schedule schB $ send sub ev
+            in do
+                ds <- liftIO newDisposableSet
 
-                forward :: Event v -> SchedulerIO s ()
-                forward ev = void $ deliver sch ev
+                schD <- liftIO $ schedule schA $ do
+                    d <- sig >>: forward
+                    liftIO $ ds `addDisposable` d
 
-            SchedulerIO $ unsafeRunSchedulerIO $ sig >>: forward
+                liftIO $ ds `addDisposable` schD
+                liftIO $ toDisposable ds
     in signal onSubscribe
 
--- | Synchronously waits for the signal to send an event.
-first :: forall s v. Scheduler s => Signal s v -> IO (Event v)
-first s = do
-    var <- newEmptyMVar
+-- | Subscribes to @sig@ and synchronously waits for an event.
+first :: forall s v. Scheduler s => Signal s v -> SchedulerIO s (Event v)
+first sig = do
+    var <- liftIO newEmptyMVar
 
     let onEvent :: Event v -> SchedulerIO s ()
         onEvent ev = void $ liftIO $ tryPutMVar var ev
-        
-        subscribe :: SchedulerIO s Disposable
-        subscribe = take s 1 >>: onEvent
 
-    unsafeRunSchedulerIO subscribe
-    takeMVar var
+    take sig 1 >>: onEvent
+    liftIO $ takeMVar var
