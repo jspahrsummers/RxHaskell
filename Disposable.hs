@@ -15,7 +15,6 @@ import Control.Applicative
 import Control.Monad
 import Data.Maybe
 import Data.Foldable as F
-import Data.Functor.Identity
 import Data.Sequence as Seq
 import Data.IORef
 import Data.Unique
