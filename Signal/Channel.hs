@@ -5,6 +5,9 @@ module Signal.Channel ( Channel
                       , newChannel
                       , ChannelCapacity(..)
                       , newReplayChannel
+                      , Signal
+                      , Subscriber
+                      , Scheduler
                       ) where
 
 import Control.Concurrent.STM

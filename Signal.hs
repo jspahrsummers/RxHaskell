@@ -9,6 +9,9 @@ module Signal ( Signal
               , never
               , Signal.empty
               , Event(..)
+              , Disposable
+              , Scheduler
+              , SchedulerIO
               ) where
 
 import Control.Applicative

@@ -6,7 +6,8 @@ module Signal.Scheduled ( start
                         , deliverOn
                         , first
                         , Scheduler
-                        , newScheduler
+                        , SchedulerIO
+                        , Signal
                         ) where
 
 import Control.Concurrent.MVar

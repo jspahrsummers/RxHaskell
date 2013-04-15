@@ -8,6 +8,11 @@ module Signal.Connection ( Connection
                          , multicastedSignal
                          , replay
                          , replayLast
+                         , Channel
+                         , Signal
+                         , Scheduler
+                         , SchedulerIO
+                         , Disposable
                          ) where
 
 import Control.Concurrent.STM

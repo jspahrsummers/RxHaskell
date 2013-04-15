@@ -10,6 +10,12 @@ module Signal.Command ( Command
                       , values
                       , onExecute
                       , errors
+                      , Channel
+                      , Signal
+                      , Scheduler
+                      , SchedulerIO
+                      , BackgroundScheduler
+                      , MainScheduler
                       ) where
 
 import Control.Concurrent.MVar
