@@ -1,12 +1,13 @@
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Signal.Channel ( newChannel
-                      , newReplayChannel
-                      , Channel
-                      , Subscriber
-                      , send
+module Signal.Channel ( Channel
+                      , newChannel
                       , ChannelCapacity(..)
+                      , newReplayChannel
+                      , Signal
+                      , Subscriber
+                      , Scheduler
                       ) where
 
 import Control.Concurrent.STM
@@ -21,10 +22,10 @@ import Signal
 import Signal.Subscriber
 import Signal.Subscriber.Internal
 
--- | A controllable signal, represented by a subscriber and signal pair.
--- |
--- | Values sent to the subscriber will automatically be broadcast to all of the signal's subscribers.
--- | In effect, the subscriber is the "write" end, while the signal is the "read" end.
+-- | A controllable signal, represented by a 'Subscriber' and 'Signal' pair.
+--
+--   Values sent to the subscriber will automatically be broadcast to all of the signal's subscribers.
+--   In effect, the subscriber is the write end, while the signal is the read end.
 type Channel s v = (Subscriber s v, Signal s v)
 
 -- | Determines how many events a replay channel will save.
@@ -33,15 +34,16 @@ data ChannelCapacity = LimitedCapacity Int  -- ^ The channel will only save the 
                      deriving (Eq, Show)
 
 -- | Creates a simple channel which broadcasts all values sent to it.
--- | Sending an 'ErrorEvent' or 'CompletedEvent' will terminate the channel.
+--
+--   Sending an 'ErrorEvent' or 'CompletedEvent' will terminate the channel.
 newChannel :: Scheduler s => IO (Channel s v)
 newChannel = newReplayChannel $ LimitedCapacity 0
 
 -- | Like 'newChannel', but new subscriptions to the returned signal will receive all values
--- | (up to the specified capacity) which have been sent thus far.
--- |
--- | Sending an 'ErrorEvent' or 'CompletedEvent' will terminate the channel. Any terminating event
--- | will be replayed to future subscribers, assuming sufficient capacity.
+--   (up to the specified capacity) which have been sent thus far.
+--
+--   Sending an 'ErrorEvent' or 'CompletedEvent' will terminate the channel. Any terminating event
+--   will be replayed to future subscribers, assuming sufficient capacity.
 newReplayChannel :: forall s v. Scheduler s => ChannelCapacity -> IO (Channel s v)
 newReplayChannel cap = do
     subs <- atomically $ newTVar Seq.empty

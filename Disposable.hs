@@ -15,7 +15,6 @@ import Control.Applicative
 import Control.Monad
 import Data.Maybe
 import Data.Foldable as F
-import Data.Functor.Identity
 import Data.Sequence as Seq
 import Data.IORef
 import Data.Unique
@@ -57,7 +56,7 @@ newDisposableSet = do
     return $ DisposableSet mref
 
 -- | Converts a set of disposables into a disposable.
--- | The constructed disposable will dispose of all disposables in the set.
+--   The constructed disposable will dispose of all disposables in the set.
 toDisposable :: DisposableSet -> IO Disposable
 toDisposable (DisposableSet mref) =
     let disposeSet = F.mapM_ dispose
