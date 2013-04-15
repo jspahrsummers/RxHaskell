@@ -2,11 +2,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Signal.Scheduled ( start
-                        , Scheduler
-                        , newScheduler
                         , subscribeOn
                         , deliverOn
                         , first
+                        , Scheduler
+                        , newScheduler
                         ) where
 
 import Control.Concurrent.MVar
@@ -17,8 +17,9 @@ import Prelude hiding (take)
 import Scheduler
 import Scheduler.Internal
 import Signal
-import Signal.Operators
 import Signal.Channel
+import Signal.Operators
+import Signal.Subscriber
 
 -- | Starts a signal which executes @action@ on @s@.
 start :: Scheduler s => s -> (Subscriber s v -> SchedulerIO s ()) -> IO (Signal s v)

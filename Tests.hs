@@ -16,6 +16,7 @@ import Signal.Command
 import Signal.Connection
 import Signal.Operators
 import Signal.Scheduled
+import Signal.Subscriber
 import System.Mem
 
 hello = fromFoldable ["hello"]

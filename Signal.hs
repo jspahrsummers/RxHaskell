@@ -3,12 +3,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Signal ( Signal
-              , Event(..)
               , signal
               , subscribe
               , (>>:)
               , never
               , Signal.empty
+              , Event(..)
               ) where
 
 import Control.Applicative
@@ -32,7 +32,11 @@ data Signal s v where
     Signal :: Scheduler s => (Subscriber s v -> SchedulerIO s Disposable) -> Signal s v
 
 -- | Constructs a signal which sends its values to new subscribers synchronously.
-signal :: Scheduler s => (Subscriber s v -> SchedulerIO s Disposable) -> Signal s v
+signal
+    :: Scheduler s
+    => (Subscriber s v -> SchedulerIO s Disposable) -- ^ An action to run on each subscription.
+    -> Signal s v                                   -- ^ The constructed signal.
+
 signal = Signal
 
 -- | Subscribes to a signal.
@@ -56,7 +60,12 @@ empty :: Scheduler s => Signal s v
 empty = mempty
 
 -- | Creates a subscriber and subscribes to the signal.
-(>>:) :: Scheduler s => Signal s v -> (Event v -> SchedulerIO s ()) -> SchedulerIO s Disposable
+(>>:)
+    :: Scheduler s
+    => Signal s v                       -- ^ The signal to subscribe to.
+    -> (Event v -> SchedulerIO s ())    -- ^ An action to run when each event is received.
+    -> SchedulerIO s Disposable         -- ^ A disposable which can be used to terminate the subscription.
+
 (>>:) s f = do
     sub <- liftIO $ subscriber f
     subscribe s sub

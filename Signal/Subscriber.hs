@@ -17,7 +17,11 @@ import Signal.Event
 import Signal.Subscriber.Internal
 
 -- | Constructs a subscriber.
-subscriber :: Scheduler s => (Event v -> SchedulerIO s ()) -> IO (Subscriber s v)
+subscriber
+    :: Scheduler s
+    => (Event v -> SchedulerIO s ())    -- ^ An action to run when each event is received.
+    -> IO (Subscriber s v)              -- ^ The constructed subscriber.
+
 subscriber f = do
     b <- atomically $ newTVar False
     d <- newDisposable $ atomically $ writeTVar b True
@@ -38,7 +42,8 @@ subscriber f = do
     }
 
 -- | Acquires a subscriber for the specified thread.
--- | This is used to ensure that a subscriber never receives multiple events concurrently.
+--
+--   This is used to ensure that a subscriber never receives multiple events concurrently.
 acquireSubscriber :: Subscriber s v -> ThreadId -> STM Bool
 acquireSubscriber sub tid = do
     d <- readTVar (disposed sub)
@@ -55,6 +60,8 @@ acquireSubscriber sub tid = do
             return True
 
 -- | Releases a subscriber from the specified thread's ownership.
+--
+--   This must match a previous call to 'acquireSubscriber'.
 releaseSubscriber :: Subscriber s v -> ThreadId -> STM ()
 releaseSubscriber sub tid = do
     -- TODO: Skip all this synchronization for singleton scheduler types.

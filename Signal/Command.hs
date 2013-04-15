@@ -2,14 +2,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Signal.Command ( Command
-                      , canExecute
+                      , CommandPolicy(..)
                       , newCommand
+                      , canExecute
                       , executing
                       , execute
-                      , errors
                       , values
                       , onExecute
-                      , CommandPolicy(..)
+                      , errors
                       ) where
 
 import Control.Concurrent.MVar
@@ -95,11 +95,12 @@ newCommand p ces = do
     return command
 
 -- | Sends whether this command is currently executing.
--- | This signal will always send at least one value immediately upon subscription.
+--
+--   This signal will always send at least one value immediately upon subscription.
 executing :: Command v -> Signal MainScheduler Bool
 executing = snd . executingChannel
 
--- | A signal of errors received from all signals created by 'doExecute'.
+-- | A signal of errors received from all signals created by 'onExecute'.
 errors :: Command v -> Signal MainScheduler IOException
 errors = snd . errorsChannel
 
@@ -108,7 +109,8 @@ values :: Command v -> Signal MainScheduler v
 values = snd . valuesChannel
 
 -- | Sends whether this command is able to execute.
--- | This signal will always send at least one value immediately upon subscription.
+--
+--   This signal will always send at least one value immediately upon subscription.
 canExecute :: Command v -> Signal MainScheduler Bool
 canExecute = snd . canExecuteChannel
 
