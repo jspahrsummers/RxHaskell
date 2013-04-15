@@ -57,7 +57,7 @@ newScheduledAction action = do
     d <- newDisposable $ atomicModifyIORef ref $ const (True, ())
     return (ScheduledAction ref action, d)
 
--- | Represents a queue of 'IO' actions which can be executed in FIFO order.
+-- | Represents a queue of 'SchedulerIO' actions which can be executed in FIFO order.
 class Scheduler s where
     -- | Schedules an action on the scheduler. Returns a disposable which can be used to cancel it.
     schedule :: s -> SchedulerIO s () -> IO Disposable

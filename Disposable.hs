@@ -19,7 +19,7 @@ import Data.Sequence as Seq
 import Data.IORef
 import Data.Unique
 
--- | Allows disposal of a resource by running an action in the monad @m@.
+-- | Allows disposal of a resource by running an 'IO' action.
 data Disposable where
     EmptyDisposable :: Disposable
     Disposable :: Unique -> IORef (Maybe (IO ())) -> Disposable

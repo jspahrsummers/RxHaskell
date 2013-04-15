@@ -4,7 +4,7 @@ stability:      alpha
 synopsis:       Reactive Extensions for Haskell
 description:    An implementation of functional reactive programming based on Microsoft's Reactive Extensions for .NET: <http://msdn.microsoft.com/en-us/library/hh242985(v=VS.103).aspx>.
                 .
-                RxHaskell offers a monadic API, making it easier to interleave side effects and imperative-style code.
+                RxHaskell offers a monadic API, making it easier to interleave side effects and imperative-style code than with arrowized FRP.
 homepage:       https://github.com/jspahrsummers/RxHaskell
 bug-reports:    https://github.com/jspahrsummers/RxHaskell/issues
 category:       FRP
