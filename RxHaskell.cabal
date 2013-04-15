@@ -1,5 +1,6 @@
 name:           RxHaskell
 version:        0.1
+stability:      alpha
 synopsis:       An implementation of Reactive Extensions for Haskell
 description:    Effectful functional reactive programming, based on Microsoft's Reactive Extensions for .NET: http://msdn.microsoft.com/en-us/library/hh242985(v=VS.103).aspx
 homepage:       https://github.com/jspahrsummers/RxHaskell
