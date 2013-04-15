@@ -146,7 +146,7 @@ execute c v = do
             when (items == 0) $ setExecuting c False
             return True
 
-    ce <- liftIO $ first $ canExecute c
+    ce <- first $ canExecute c
 
     case ce of
         (NextEvent True) -> execute'
