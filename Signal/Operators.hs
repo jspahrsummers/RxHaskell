@@ -1,18 +1,18 @@
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Signal.Operators ( fromFoldable
-                        , materialize
-                        , dematerialize
-                        , filter
-                        , doEvent
+module Signal.Operators ( doEvent
                         , doNext
                         , doError
                         , doCompleted
                         , finally
+                        , materialize
+                        , dematerialize
+                        , fromFoldable
+                        , map
+                        , filter
                         , take
                         , drop
-                        , map
                         , switch
                         , combine
                         , never
@@ -33,12 +33,11 @@ import Scheduler
 import Signal
 import Signal.Subscriber
 
--- | Turns any Foldable into a signal.
+-- | Turns any 'Foldable' into a signal.
 fromFoldable :: (Foldable t, Scheduler s) => t v -> Signal s v
 fromFoldable = foldMap return
 
--- | Treats every signal event as a 'NextEvent' containing the event itself.
--- | This can be used to make all signal events bindable.
+-- | Brings every signal event into the monad, as a 'NextEvent' containing the event itself.
 materialize :: Scheduler s => Signal s v -> Signal s (Event v)
 materialize s =
     signal $ \sub ->

@@ -4,10 +4,15 @@
 module Signal.Connection ( Connection
                          , multicast
                          , publish
+                         , connect
+                         , multicastedSignal
                          , replay
                          , replayLast
-                         , multicastedSignal
-                         , connect
+                         , Channel
+                         , Signal
+                         , Scheduler
+                         , SchedulerIO
+                         , Disposable
                          ) where
 
 import Control.Concurrent.STM
@@ -27,7 +32,7 @@ data Connection s v = Connection {
 }
 
 -- | Creates a connection that will subscribe to the given base signal,
--- | and forward all events onto the given channel.
+--   and forward all events onto the given channel.
 multicast :: Scheduler s => Signal s v -> Channel s v -> IO (Connection s v)
 multicast sig chan = do
     d <- atomically $ newTVar EmptyDisposable
@@ -63,12 +68,13 @@ replayLast sig = do
     return $ multicastedSignal conn
 
 -- | Returns the multicasted signal of a connection.
--- | No events will be sent on the resulting signal until 'connect' is invoked.
+--
+--   No events will be sent on the resulting signal until 'connect' is invoked.
 multicastedSignal :: Connection s v -> Signal s v
 multicastedSignal conn = snd $ channel conn
 
 -- | Activates a connection by subscribing to its underlying signal.
--- | Calling this function multiple times just returns the existing disposable.
+--   Calling this function multiple times just returns the existing disposable.
 connect :: forall s v. Scheduler s => Connection s v -> SchedulerIO s Disposable
 connect conn =
     let connect' :: SchedulerIO s Disposable

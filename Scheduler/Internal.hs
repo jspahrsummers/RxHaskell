@@ -3,9 +3,9 @@
 
 module Scheduler.Internal ( SchedulerIO(..)
                           , unsafeRunSchedulerIO
-                          , ScheduledAction
                           , Scheduler(..)
                           , BackgroundScheduler(..)
+                          , ScheduledAction
                           , newScheduledAction
                           , executeScheduledAction
                           ) where
@@ -19,14 +19,14 @@ import Data.Functor
 import Data.IORef
 import Disposable
 
--- | An IO computation that must be performed in a scheduler of type @s@.
+-- | An 'IO' computation that must be performed in a scheduler of type @s@.
 data SchedulerIO s a where
     SchedulerIO :: Scheduler s => IO a -> SchedulerIO s a
 
--- | Extracts the underlying IO action from a 'SchedulerIO' action.
--- |
--- | This can be unsafe because the type system does not have enough information to determine
--- | whether the calling code is running on an appropriate scheduler.
+-- | Extracts the underlying 'IO' action from a 'SchedulerIO' action.
+--
+--   This can be unsafe because the type system does not have enough information to determine
+--   whether the calling code is running on an appropriate scheduler.
 unsafeRunSchedulerIO :: Scheduler s => SchedulerIO s a -> IO a
 unsafeRunSchedulerIO (SchedulerIO action) = action
 
@@ -58,7 +58,7 @@ newScheduledAction action = do
     d <- newDisposable $ atomicModifyIORef ref $ const (True, ())
     return (ScheduledAction ref action, d)
 
--- | Represents a queue of IO actions which can be executed in FIFO order.
+-- | Represents a queue of 'IO' actions which can be executed in FIFO order.
 class Scheduler s where
     -- | Schedules an action on the scheduler. Returns a disposable which can be used to cancel it.
     schedule :: s -> SchedulerIO s () -> IO Disposable
