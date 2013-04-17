@@ -5,16 +5,18 @@ module Signal.Scheduled ( start
                         , subscribeOn
                         , deliverOn
                         , first
+                        , last
                         , Scheduler
                         , SchedulerIO
                         , Signal
                         ) where
 
 import Control.Concurrent.MVar
+import Control.Concurrent.STM
 import Control.Monad
 import Control.Monad.IO.Class
 import Disposable
-import Prelude hiding (take)
+import Prelude hiding (take, last)
 import Scheduler
 import Signal
 import Signal.Channel
@@ -75,3 +77,16 @@ first sig = do
 
     take sig 1 >>: onEvent
     liftIO $ takeMVar var
+
+-- | Subscribes to @sig@ and synchronously waits for the value of the final 'NextEvent' (if any).
+last :: forall s v. Scheduler s => Signal s v -> SchedulerIO s (Maybe v)
+last sig = do
+    previousValue <- liftIO $ newTVarIO Nothing
+    lastValue <- liftIO newEmptyTMVarIO
+
+    let onEvent :: Event v -> SchedulerIO s ()
+        onEvent (NextEvent v) = liftIO $ atomically $ writeTVar previousValue $ Just v
+        onEvent _ = liftIO $ atomically $ readTVar previousValue >>= putTMVar lastValue
+
+    sig >>: onEvent
+    liftIO $ atomically $ takeTMVar lastValue
