@@ -4,7 +4,7 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Zip
 import Data.Monoid
-import Prelude hiding (filter, take, drop)
+import Prelude hiding (filter, take, drop, last)
 import Disposable
 import Scheduler
 import Scheduler.Main
@@ -82,6 +82,18 @@ testFirst = do
 
     ev <- first sig
     liftIO $ print ev
+
+testLast:: SchedulerIO MainScheduler ()
+testLast = do
+    (sub, sig) <- liftIO $ newReplayChannel UnlimitedCapacity
+    send sub $ NextEvent "foo"
+    send sub $ NextEvent "bar"
+    send sub $ NextEvent "hello"
+    send sub $ NextEvent "world"
+    send sub $ CompletedEvent
+
+    mv <- last sig
+    liftIO $ print mv
 
 testFilter :: SchedulerIO MainScheduler ()
 testFilter = do
@@ -283,3 +295,18 @@ testSubscriberDisposal =
         send sub $ NextEvent "world"
         return EmptyDisposable
     in void $ s >>: liftIO . print
+
+testHistory :: SchedulerIO MainScheduler ()
+testHistory = do
+    history (hello `mappend` world `mappend` hello `mappend` world)
+        >>: liftIO . print
+    
+    return ()
+
+testMapAccum :: SchedulerIO MainScheduler ()
+testMapAccum = do
+    hello `mappend` world `mappend` hello `mappend` world
+        `mapAccum` return
+        >>: liftIO . print
+    
+    return ()
