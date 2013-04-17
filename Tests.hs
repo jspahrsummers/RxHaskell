@@ -283,3 +283,11 @@ testSubscriberDisposal =
         send sub $ NextEvent "world"
         return EmptyDisposable
     in void $ s >>: liftIO . print
+
+testMapAccum :: SchedulerIO MainScheduler ()
+testMapAccum = do
+    hello `mappend` world `mappend` hello `mappend` world
+        `mapAccum` return
+        >>: liftIO . print
+    
+    return ()
