@@ -10,6 +10,7 @@ module Signal.Operators ( doEvent
                         , dematerialize
                         , fromFoldable
                         , map
+                        , history
                         , mapAccum
                         , filter
                         , take
@@ -227,17 +228,11 @@ combine a b =
 
         liftIO $ toDisposable ds
 
--- | Accumulates a signal's history, and maps it to the values for a new signal.
+-- | Returns a live history of the values in @sig@.
 --
---   This function is similar to @extend@ in a 'Comonad'.
-mapAccum
-    :: forall a b s. Scheduler s
-    => Signal s a                   -- ^ The signal to save the history for.
-                                    --   Whenever this signal sends a 'NextEvent', @f@ will be reinvoked with all values thus far (including the latest).
-    -> (Seq a -> SchedulerIO s b)   -- ^ A function that maps all values so far to a new value.
-    -> Signal s b                   -- ^ A signal consisting of all results from @f@.
-
-mapAccum sig f =
+--   This function is similar to @duplicate@ in a 'Comonad'.
+history :: forall a s. Scheduler s => Signal s a -> Signal s (Seq a)
+history sig =
     signal $ \sub -> do
         values <- liftIO $ newIORef Seq.empty
 
@@ -249,11 +244,31 @@ mapAccum sig f =
             onEvent :: Event a -> SchedulerIO s ()
             onEvent (NextEvent v) = do
                 values' <- liftIO $ atomicModifyIORef values $ append v
-                b <- f values'
-
-                send sub $ NextEvent b
+                send sub $ NextEvent values'
 
             onEvent (ErrorEvent err) = send sub $ ErrorEvent err
             onEvent CompletedEvent = send sub CompletedEvent
 
         sig >>: onEvent
+
+-- | Accumulates a signal's 'history', and maps it to the values for a new signal.
+--
+--   This function is similar to @extend@ in a 'Comonad'.
+mapAccum
+    :: forall a b s. Scheduler s
+    => Signal s a                   -- ^ The signal to save the history for.
+                                    --   Whenever this signal sends a 'NextEvent', @f@ will be reinvoked with all values thus far (including the latest).
+    -> (Seq a -> SchedulerIO s b)   -- ^ A function that maps all values so far to a new value.
+    -> Signal s b                   -- ^ A signal consisting of all results from @f@.
+
+mapAccum sig f =
+    signal $ \sub -> do
+        let onEvent :: Event (Seq a) -> SchedulerIO s ()
+            onEvent (NextEvent values) = do
+                b <- f values
+                send sub $ NextEvent b
+
+            onEvent (ErrorEvent err) = send sub $ ErrorEvent err
+            onEvent CompletedEvent = send sub CompletedEvent
+
+        history sig >>: onEvent

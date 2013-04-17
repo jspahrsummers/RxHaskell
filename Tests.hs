@@ -296,6 +296,13 @@ testSubscriberDisposal =
         return EmptyDisposable
     in void $ s >>: liftIO . print
 
+testHistory :: SchedulerIO MainScheduler ()
+testHistory = do
+    history (hello `mappend` world `mappend` hello `mappend` world)
+        >>: liftIO . print
+    
+    return ()
+
 testMapAccum :: SchedulerIO MainScheduler ()
 testMapAccum = do
     hello `mappend` world `mappend` hello `mappend` world
