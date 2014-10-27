@@ -1,3 +1,3 @@
 # RxHaskell
 
-![I have no idea what I'm doing](http://hehpic.com/eD.jpg)
+![I have no idea what I'm doing](http://i.imgur.com/NuMEL.gif)
